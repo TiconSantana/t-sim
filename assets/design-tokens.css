@@ -1,0 +1,18 @@
+:root {
+  --ts-ink-950: #071b30;
+  --ts-ink-900: #0a2541;
+  --ts-ink-800: #12375b;
+  --ts-ink-700: #255377;
+  --ts-ink-500: #6a859e;
+  --ts-ink-300: #b6c6d4;
+  --ts-ink-200: #d7e2ea;
+  --ts-ink-100: #e9f0f4;
+  --ts-paper: #f4f7f9;
+  --ts-blue-600: #1769aa;
+  --ts-blue-700: #0e4e86;
+  --ts-orange-500: #e4762d;
+  --ts-green-600: #167d62;
+  --ts-violet-600: #6c5bd4;
+  --ts-font-heading: 'Space Grotesk', sans-serif;
+  --ts-font-body: 'DM Sans', sans-serif;
+}

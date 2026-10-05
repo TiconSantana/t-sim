@@ -1,0 +1,33 @@
+{
+  "brand": {
+    "name": "T-Sim",
+    "tagline": "Simular antes. Decidir melhor.",
+    "fontHeading": "Space Grotesk",
+    "fontBody": "DM Sans"
+  },
+  "primitive": {
+    "ink950": "#071B30",
+    "ink900": "#0A2541",
+    "ink800": "#12375B",
+    "ink700": "#255377",
+    "ink500": "#6A859E",
+    "ink300": "#B6C6D4",
+    "ink200": "#D7E2EA",
+    "ink100": "#E9F0F4",
+    "paper": "#F4F7F9",
+    "blue600": "#1769AA",
+    "blue700": "#0E4E86",
+    "orange500": "#E4762D",
+    "green600": "#167D62",
+    "violet600": "#6C5BD4"
+  },
+  "semantic": {
+    "surface": "#FFFFFF",
+    "textStrong": "#071B30",
+    "textMuted": "#6A859E",
+    "action": "#1769AA",
+    "decision": "#E4762D",
+    "valid": "#167D62",
+    "analysis": "#6C5BD4"
+  }
+}
