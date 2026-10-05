@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">T-Sim</title>
+  <desc id="desc">Marca T-Sim em azul técnico, laranja de destaque e verde de decisão</desc>
+  <rect width="512" height="512" rx="112" fill="#09233f"/>
+  <path d="M92 118h328v64H296v212h-80V182H92z" fill="#f4f7f9"/>
+  <path d="M310 278c0-46 35-82 83-82 14 0 29 4 43 11v65c-12-9-25-14-38-14-20 0-34 8-34 22 0 11 8 16 29 22 33 10 52 28 52 60 0 47-36 79-91 79-19 0-39-4-56-12v-67c16 10 34 16 50 16 18 0 30-6 30-18 0-11-9-16-29-22-30-9-39-27-39-60z" fill="#f47b34"/>
+  <circle cx="416" cy="113" r="22" fill="#47b881"/>
+</svg>
