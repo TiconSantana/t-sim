@@ -31,7 +31,12 @@ export async function signInCloud(email, password) {
 
 export async function signUpCloud(email, password) {
   if (!supabase) return { error: new Error('Cloud não configurada.') };
-  const result = await supabase.auth.signUp({ email, password });
+  const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined;
+  const result = await supabase.auth.signUp({
+    email,
+    password,
+    options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
+  });
   return result;
 }
 
