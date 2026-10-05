@@ -27,21 +27,21 @@ Para que as simulações sejam acessíveis em mais de um aparelho, o armazenamen
 - trilha de auditoria e versões dos cenários;
 - sincronização com fallback local quando estiver sem conexão.
 
-O plano gratuito é adequado para validação e uso inicial, sem contratação de serviço pago.
+O T-Sim está conectado ao projeto Supabase **Tconnect** (`vyrxopbrgpndzfayflve`), na região `sa-east-1`, reutilizando a tabela protegida `public.cenario_simulador` e a função de vínculo do usuário já existente na plataforma. O plano gratuito é adequado para validação e uso inicial, sem contratação de serviço pago.
 
 ## Limite atual
 
-Enquanto a conta cloud não for conectada, cada navegador terá seu próprio workspace local. O PWA melhora instalação e disponibilidade, mas não sincroniza dados entre aparelhos sozinho.
+O endereço público já está publicado em `https://t-sim.vercel.app`. O primeiro acesso ainda pode operar no fallback local. Depois de entrar com um usuário Tconnect no painel **Configurações → Sincronização online**, o T-Sim salva e recupera o workspace no Supabase. Se a conta autenticada ainda não possuir um vínculo em `public.colaborador`, o app informa essa condição e continua no modo local.
 
 ## Ordem de ativação
 
-1. Criar ou selecionar a conta gratuita de hospedagem.
-2. Publicar este repositório como projeto web.
-3. Criar o projeto gratuito de banco/autenticação.
-4. Aplicar as tabelas, políticas de acesso e migrações do T-Sim.
-5. Migrar o storage local para a camada cloud com fila offline.
-6. Validar login, isolamento por empresa, sincronização e recuperação de backup.
-7. Publicar o endereço definitivo e, se desejado, conectar domínio próprio.
+1. Repositório criado em `https://github.com/TiconSantana/t-sim`.
+2. Projeto Vercel `t-sim` criado com deploy automático a partir da branch `main`.
+3. Variáveis públicas do Supabase configuradas na Vercel para Production.
+4. Persistência cloud usando `public.cenario_simulador` com RLS existente.
+5. Falta apenas autenticar um usuário Tconnect e confirmar que ele possui vínculo em `public.colaborador`.
+6. Depois disso, validar login, isolamento por empresa, sincronização e recuperação de backup.
+7. Se desejado, conectar domínio próprio.
 
 ## Decisão necessária para a próxima etapa
 
