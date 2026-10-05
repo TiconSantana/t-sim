@@ -462,15 +462,18 @@ function App() {
     if (!cloudEnabled || !supabase) return undefined;
     let active = true;
     const authParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-    if (authParams.get('error_code') === 'otp_expired' || authParams.get('error') === 'access_denied') {
-      setCloud({ status: 'signed_out', email: '', session: null, message: 'O link de confirmação expirou. Crie o acesso novamente para receber um novo e-mail.' });
+    const authErrorMessage = authParams.get('error_code') === 'otp_expired' || authParams.get('error') === 'access_denied'
+      ? 'O link de confirmação expirou. Crie o acesso novamente para receber um novo e-mail.'
+      : '';
+    if (authErrorMessage) {
+      setCloud({ status: 'signed_out', email: '', session: null, message: authErrorMessage });
       window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
     }
     async function hydrate() {
       const session = await getCloudSession();
       if (!active) return;
       if (!session) {
-        setCloud({ status: 'signed_out', email: '', session: null, message: '' });
+        setCloud({ status: 'signed_out', email: '', session: null, message: authErrorMessage });
         return;
       }
       const workspace = await loadCloudWorkspace(session);
