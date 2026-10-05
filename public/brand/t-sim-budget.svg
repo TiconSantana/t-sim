@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="title desc">
+  <title id="title">T-Sim Budget</title><desc id="desc">Símbolo visual da visão Budget.</desc>
+  <rect width="120" height="120" rx="28" fill="#F4F7F9" stroke="#D7E2EA" stroke-width="2"/>
+  <path d="M20 21h44v10H48v18H36V31H20z" fill="#071B30"/>
+  <path d="M57 40c0-7 6-13 14-13 4 0 7 1 10 3v9c-3-2-5-3-8-3-3 0-5 1-5 3 0 2 1 3 5 4 6 2 10 5 10 10 0 7-6 12-15 12-4 0-8-1-11-3v-9c3 2 6 3 9 3s5-1 5-3c0-2-1-3-5-4-6-2-9-4-9-9z" fill="#E4762D"/>
+  <circle cx="93" cy="22" r="5" fill="#167D62"/>
+  <g color="#E4762D"><path d="M30 88V60M60 88V39M90 88V25" stroke="currentColor" stroke-width="12" stroke-linecap="round"/><path d="M23 94h74" stroke="currentColor" stroke-width="5" stroke-linecap="round"/></g>
+</svg>

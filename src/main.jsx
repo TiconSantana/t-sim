@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Activity,
@@ -33,6 +33,7 @@ import { costAssumptions, operationalCosts, teamClasses } from './data/operacao'
 import { calculateSimulation } from './domain/simulation';
 import { calculateCoverage, validateScenarioForApproval } from './domain/operations';
 import { loadApprovals, loadConfiguration, loadOperations, loadSavedScenarios, saveApproval, saveConfiguration, saveOperations, saveScenario } from './storage/scenarios';
+import { cloudEnabled, describeCloudError, getCloudSession, loadCloudWorkspace, signInCloud, signOutCloud, signUpCloud, saveCloudWorkspace, supabase } from './cloud/supabase';
 import * as XLSX from 'xlsx';
 import './styles.css';
 
@@ -47,6 +48,19 @@ const navItems = [
   { id: 'analytics', label: 'Analytics', icon: LineChart },
   { id: 'ai', label: 'T-Sim AI', icon: Sparkles },
   { id: 'settings', label: 'Configurações', icon: Settings },
+];
+
+const platformViews = [
+  { id: 'overview', label: 'Visão geral', eyebrow: 'RADAR', decision: 'Encontre o próximo ponto de decisão', source: 'Cargos · cenários · cobertura', accent: 'blue' },
+  { id: 'simulator', label: 'Simulador', eyebrow: 'MOVIMENTO', decision: 'Teste origem, destino e quantidade', source: 'Custo empresa · delta · saldo', accent: 'orange' },
+  { id: 'people', label: 'People', eyebrow: 'BASE', decision: 'Confirme a grade e a elegibilidade', source: '6 níveis · salários · encargos', accent: 'blue' },
+  { id: 'scenarios', label: 'Cenários', eyebrow: 'ALTERNATIVAS', decision: 'Compare escolhas antes de aprovar', source: 'Conservador · equilibrado · agressivo', accent: 'violet' },
+  { id: 'ops', label: 'Ops', eyebrow: 'COBERTURA', decision: 'Proteja SLA, equipe e capacidade', source: 'Headcount · requisito · margem', accent: 'green' },
+  { id: 'reports', label: 'Pareceres', eyebrow: 'AUDITORIA', decision: 'Registre evidência e aprovação', source: 'Fonte · versão · decisão', accent: 'blue' },
+  { id: 'budget', label: 'Budget', eyebrow: 'FOLHA', decision: 'Leia o impacto no orçamento', source: 'Waterfall · ADM · BDI · margem', accent: 'orange' },
+  { id: 'analytics', label: 'Analytics', eyebrow: 'INDICADORES', decision: 'Observe custos e padrões', source: 'Campo · sala técnica · equipes', accent: 'violet' },
+  { id: 'ai', label: 'T-Sim AI', eyebrow: 'VALIDAÇÃO', decision: 'Pergunte o que ainda falta validar', source: 'Regras locais · lacunas declaradas', accent: 'green' },
+  { id: 'settings', label: 'Configurações', eyebrow: 'CONTROLE', decision: 'Gerencie fontes e persistência', source: 'Backup · restauração · versão', accent: 'blue' },
 ];
 
 function money(value, compact = false) {
@@ -252,8 +266,10 @@ function AnalyticsView({ savedScenarios }) {
   return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> ANALYTICS</div><h1>Custos e operação<br /><em>na mesma leitura.</em></h1><p>Use os dados operacionais da planilha de custos para contextualizar a decisão de pessoas e identificar concentração de impacto.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Fonte operacional</div><strong>V.TAL · 2025</strong><span>Controle Local, equipes e sala técnica</span><button onClick={() => setSourceMessage('Fonte: Cópia de Custos e Preço V3 · Encargos atualizados')}>Ver fonte <ChevronRight size={14} /></button>{sourceMessage && <small className="source-message">{sourceMessage}</small>}</div></section><section className="metric-grid"><Metric label="Custo operacional mensal" value={money(totalOperational)} detail="contextos importados da planilha" tone="blue" icon={BarChart3} /><Metric label="Headcount de referência" value={totalHeadcount} detail="soma dos contextos operacionais" tone="violet" icon={UsersRound} /><Metric label="Maior concentração" value={money(maxCost)} detail="Controle Local FTTH" tone="orange" icon={TriangleAlert} /><Metric label="Cenários disponíveis" value={savedScenarios.length} detail="para cruzar com operação" tone="green" icon={Layers3} /></section><section className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Mapa de custo por contexto</h2><p>Valores mensais informados na fonte operacional</p></div></div><span className="source-chip"><span /> Fonte rastreada</span></div><div className="analytics-bars">{operationalCosts.map((item) => <div className="analytics-bar-row" key={item.id}><div className="analytics-bar-label"><strong>{item.label}</strong><small>{item.headcount} HC · {item.source}</small></div><div className="analytics-track"><span style={{ width: `${(item.monthlyCost / maxCost) * 100}%` }} /></div><b>{money(item.monthlyCost, true)}</b></div>)}</div></section><section className="analytics-grid"><div className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Classes de equipe</h2><p>Custo unitário e headcount de referência</p></div></div></div><div className="class-table">{teamClasses.map((item) => <div key={item.id}><strong>{item.label}</strong><span>{item.headcount} HC · {item.teamCount} equipes</span><b>{money(item.unitCost)}</b></div>)}</div></div><div className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Leitura executiva</h2><p>Pontos para validação</p></div></div></div><div className="insight-list analytics-insights"><div className="insight-item"><span className="insight-number">01</span><div><strong>Contextos não devem ser misturados</strong><p>A grade de cargos usa 113% de encargos; a operação usa 128%, ADM e BDI próprios.</p></div></div><div className="insight-item"><span className="insight-number">02</span><div><strong>Controle local concentra o maior custo</strong><p>Valide headcount e capacidade antes de aprovar uma economia de folha.</p></div></div><div className="insight-item"><span className="insight-number">03</span><div><strong>ROI permanece estimado</strong><p>Sem histórico de retenção, produtividade e turnover, a recomendação deve permanecer indicativa.</p></div></div></div></div></section></>;
 }
 
-function SettingsView({ configuration, operations, savedScenarios, approvals, onResetConfiguration, onClearWorkspace, onRestoreWorkspace }) {
+function SettingsView({ configuration, operations, savedScenarios, approvals, cloud, onCloudSignIn, onCloudSignUp, onCloudSignOut, onResetConfiguration, onClearWorkspace, onRestoreWorkspace }) {
   const [message, setMessage] = useState('');
+  const [cloudEmail, setCloudEmail] = useState('');
+  const [cloudPassword, setCloudPassword] = useState('');
   const fileInputRef = useRef(null);
   function reset() { onResetConfiguration(); setMessage('Premissas de cargos restauradas.'); }
   function clear() { if (!window.confirm('Limpar cenários, aprovações e operações locais deste navegador?')) return; onClearWorkspace(); setMessage('Cenários, aprovações e operações locais removidos.'); }
@@ -277,7 +293,14 @@ function SettingsView({ configuration, operations, savedScenarios, approvals, on
       event.target.value = '';
     }
   }
-  return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> CONFIGURAÇÕES</div><h1>Controle as<br /><em>premissas locais.</em></h1><p>Esta área mantém o ambiente de demonstração organizado enquanto o backend ainda não está conectado.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Ambiente atual</div><strong>Local · navegador</strong><span>Sem serviços pagos ou dados enviados</span><button onClick={() => setMessage('O T-Sim está operando somente com dados locais.')}>Ver status <ChevronRight size={14} /></button></div></section><section className="settings-grid"><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Fonte e governança</h2><p>Metadados do workspace</p></div></div></div><div className="settings-list"><div><span>Workspace</span><strong>V.TAL · Bahia</strong></div><div><span>Responsável</span><strong>Tiago Santana · Administrador</strong></div><div><span>Persistência</span><strong>localStorage · versão demonstrativa</strong></div><div><span>Classificação dos resultados</span><strong>Informados, calculados e estimados</strong></div></div></div><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Ações do ambiente</h2><p>Recuperação segura do protótipo</p></div></div></div><div className="settings-actions"><button className="secondary-button" onClick={reset}>Restaurar cargos e encargos</button><button className="secondary-button" onClick={clear}>Limpar dados locais do workspace</button></div><div className="settings-backup"><input ref={fileInputRef} hidden type="file" accept="application/json,.json" onChange={importWorkspace} /><button className="secondary-button" onClick={exportWorkspace}>Exportar backup JSON</button><button className="secondary-button" onClick={() => fileInputRef.current?.click()}>Restaurar backup JSON</button></div>{message && <div className="settings-message"><Check size={15} />{message}</div>}<div className="panel-note"><ShieldCheck size={16} /><span>Estas ações afetam somente o armazenamento local deste navegador. Não há transmissão para terceiros.</span></div></div></section></>;
+  async function submitCloud(action) {
+    if (!cloudEmail || !cloudPassword) { setMessage('Informe e-mail e senha para continuar.'); return; }
+    const result = await action(cloudEmail, cloudPassword);
+    if (result?.error) setMessage(describeCloudError(result.error));
+    else setMessage(action === onCloudSignUp ? 'Cadastro enviado. Confirme o e-mail se a conta exigir verificação.' : 'Sessão cloud iniciada.');
+    setCloudPassword('');
+  }
+  return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> CONFIGURAÇÕES</div><h1>Controle as<br /><em>premissas locais.</em></h1><p>Gerencie o workspace local e, quando autenticado, mantenha a mesma simulação disponível em outros aparelhos.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Ambiente atual</div><strong>{cloud.status === 'ready' ? 'Cloud conectado' : 'Local · navegador'}</strong><span>{cloud.status === 'ready' ? cloud.email : 'Fallback local ativo'}</span><button onClick={() => setMessage(cloud.status === 'ready' ? 'Sincronização cloud ativa.' : 'O T-Sim está operando com fallback local.')}>Ver status <ChevronRight size={14} /></button></div></section><section className="settings-grid"><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Fonte e governança</h2><p>Metadados do workspace</p></div></div></div><div className="settings-list"><div><span>Workspace</span><strong>V.TAL · Bahia</strong></div><div><span>Responsável</span><strong>Tiago Santana · Administrador</strong></div><div><span>Persistência</span><strong>{cloud.status === 'ready' ? 'Supabase · sincronização ativa' : 'localStorage · fallback'}</strong></div><div><span>Classificação dos resultados</span><strong>Informados, calculados e estimados</strong></div></div></div><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Ações do ambiente</h2><p>Recuperação segura do workspace</p></div></div></div><div className="settings-actions"><button className="secondary-button" onClick={reset}>Restaurar cargos e encargos</button><button className="secondary-button" onClick={clear}>Limpar dados locais do workspace</button></div><div className="settings-backup"><input ref={fileInputRef} hidden type="file" accept="application/json,.json" onChange={importWorkspace} /><button className="secondary-button" onClick={exportWorkspace}>Exportar backup JSON</button><button className="secondary-button" onClick={() => fileInputRef.current?.click()}>Restaurar backup JSON</button></div>{message && <div className="settings-message"><Check size={15} />{message}</div>}<div className="panel-note"><ShieldCheck size={16} /><span>O fallback local permanece disponível para trabalhar sem rede.</span></div></div></section><section className="panel-surface cloud-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Sincronização online</h2><p>Acesse os mesmos cenários em qualquer aparelho</p></div></div><span className={`cloud-status cloud-${cloud.status}`}><span />{cloudEnabled ? (cloud.status === 'ready' ? 'Conectado' : cloud.status === 'loading' ? 'Conectando' : 'Disponível') : 'Não configurado'}</span></div>{cloud.status === 'ready' ? <div className="cloud-connected"><div><strong>{cloud.email}</strong><span>Workspace sincronizado com o Supabase</span></div><button className="secondary-button" onClick={onCloudSignOut}>Sair da conta</button></div> : cloudEnabled ? <div className="cloud-auth-grid"><label className="field"><span>E-mail</span><input type="email" value={cloudEmail} onChange={(event) => setCloudEmail(event.target.value)} placeholder="seu@email.com" /></label><label className="field"><span>Senha</span><input type="password" value={cloudPassword} onChange={(event) => setCloudPassword(event.target.value)} placeholder="mínimo de 6 caracteres" /></label><div className="cloud-actions"><button className="primary-button" onClick={() => submitCloud(onCloudSignIn)}>Entrar e sincronizar</button><button className="secondary-button" onClick={() => submitCloud(onCloudSignUp)}>Criar acesso</button></div></div> : <div className="panel-note"><TriangleAlert size={16} /><span>Defina as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY na hospedagem para habilitar esta área.</span></div>}{cloud.message && <div className="settings-message"><Database size={15} />{cloud.message}</div>}</section></>;
 }
 
 function AiView({ calc, operations }) {
@@ -307,6 +330,8 @@ function App() {
   const [operations, setOperations] = useState(() => loadOperations({ teamHeadcount: 609, requiredHeadcount: 609, slaTarget: 95, safetyBuffer: 10 }));
   const [approvals, setApprovals] = useState(() => loadApprovals());
   const [saveMessage, setSaveMessage] = useState('');
+  const [cloud, setCloud] = useState(() => ({ status: cloudEnabled ? 'loading' : 'disabled', email: '', session: null, message: '' }));
+  const [cloudWorkspaceId, setCloudWorkspaceId] = useState(() => window.localStorage.getItem('tsim.cloud.workspace-id.v1') || null);
 
   const calc = useMemo(() => calculateSimulation({
     dismissedRole,
@@ -323,27 +348,35 @@ function App() {
   function handleSaveConfiguration(nextConfiguration) {
     saveConfiguration(nextConfiguration);
     setConfiguration(nextConfiguration);
+    syncCloud({ configuration: nextConfiguration });
   }
 
   function handleResetConfiguration() {
     window.localStorage.removeItem('tsim.configuration.v1');
-    setConfiguration({ cargos: cargos.map((cargo) => ({ ...cargo })), encargos: 1.13 });
+    const nextConfiguration = { cargos: cargos.map((cargo) => ({ ...cargo })), encargos: 1.13 };
+    setConfiguration(nextConfiguration);
+    syncCloud({ configuration: nextConfiguration });
   }
 
   function handleSaveOperations(nextOperations) {
     saveOperations(nextOperations);
     setOperations(nextOperations);
+    syncCloud({ operations: nextOperations });
   }
 
   function handleApproval(scenarioId, status) {
-    setApprovals(saveApproval(scenarioId, { status }));
+    const nextApprovals = saveApproval(scenarioId, { status });
+    setApprovals(nextApprovals);
+    syncCloud({ approvals: nextApprovals });
   }
 
   function handleClearWorkspace() {
     ['tsim.saved-scenarios.v1', 'tsim.operations.v1', 'tsim.approvals.v1'].forEach((key) => window.localStorage.removeItem(key));
+    const nextOperations = { teamHeadcount: 609, requiredHeadcount: 609, slaTarget: 95, safetyBuffer: 10 };
     setSavedScenarios([]);
-    setOperations({ teamHeadcount: 609, requiredHeadcount: 609, slaTarget: 95, safetyBuffer: 10 });
+    setOperations(nextOperations);
     setApprovals({});
+    syncCloud({ savedScenarios: [], operations: nextOperations, approvals: {} });
   }
 
   function handleRestoreWorkspace(payload) {
@@ -355,7 +388,94 @@ function App() {
     setOperations(payload.operations);
     setSavedScenarios(payload.savedScenarios ?? []);
     setApprovals(payload.approvals ?? {});
+    syncCloud(payload);
   }
+
+  function currentCloudPayload(overrides = {}) {
+    return {
+      schemaVersion: 1,
+      updatedAt: new Date().toISOString(),
+      configuration,
+      operations,
+      savedScenarios,
+      approvals,
+      ...overrides,
+    };
+  }
+
+  async function syncCloud(overrides = {}) {
+    if (cloud.status !== 'ready' || !cloud.session) return;
+    const result = await saveCloudWorkspace(cloud.session, currentCloudPayload(overrides), cloudWorkspaceId);
+    if (result.error) {
+      setCloud((current) => ({ ...current, message: describeCloudError(result.error) }));
+      return;
+    }
+    if (result.workspaceId && result.workspaceId !== cloudWorkspaceId) {
+      window.localStorage.setItem('tsim.cloud.workspace-id.v1', result.workspaceId);
+      setCloudWorkspaceId(result.workspaceId);
+    }
+    setCloud((current) => ({ ...current, message: 'Workspace sincronizado.' }));
+  }
+
+  async function handleCloudSignIn(email, password) {
+    setCloud((current) => ({ ...current, status: 'loading', message: '' }));
+    const result = await signInCloud(email, password);
+    if (result.error) {
+      setCloud((current) => ({ ...current, status: 'signed_out', message: describeCloudError(result.error) }));
+      return result;
+    }
+    const session = result.data?.session || await getCloudSession();
+    if (!session) return { error: new Error('Sessão não iniciada.') };
+    const workspace = await loadCloudWorkspace(session);
+    if (workspace.error) {
+      setCloud({ status: 'ready', email: session.user.email || email, session, message: describeCloudError(workspace.error) });
+    } else {
+      if (workspace.payload) handleRestoreWorkspace(workspace.payload);
+      if (workspace.workspaceId) {
+        window.localStorage.setItem('tsim.cloud.workspace-id.v1', workspace.workspaceId);
+        setCloudWorkspaceId(workspace.workspaceId);
+      }
+      setCloud({ status: 'ready', email: session.user.email || email, session, message: workspace.payload ? 'Workspace cloud carregado.' : 'Sessão cloud iniciada.' });
+    }
+    return result;
+  }
+
+  async function handleCloudSignUp(email, password) {
+    setCloud((current) => ({ ...current, status: 'loading', message: '' }));
+    const result = await signUpCloud(email, password);
+    if (result.error) setCloud((current) => ({ ...current, status: 'signed_out', message: describeCloudError(result.error) }));
+    else setCloud((current) => ({ ...current, status: result.data?.session ? 'ready' : 'signed_out', message: result.data?.session ? 'Conta criada e conectada.' : 'Cadastro enviado. Confirme o e-mail para entrar.' }));
+    return result;
+  }
+
+  async function handleCloudSignOut() {
+    await signOutCloud();
+    setCloud({ status: cloudEnabled ? 'signed_out' : 'disabled', email: '', session: null, message: 'Sessão encerrada. Fallback local ativo.' });
+  }
+
+  useEffect(() => {
+    if (!cloudEnabled || !supabase) return undefined;
+    let active = true;
+    async function hydrate() {
+      const session = await getCloudSession();
+      if (!active) return;
+      if (!session) {
+        setCloud({ status: 'signed_out', email: '', session: null, message: '' });
+        return;
+      }
+      const workspace = await loadCloudWorkspace(session);
+      if (!active) return;
+      if (workspace.payload) handleRestoreWorkspace(workspace.payload);
+      if (workspace.workspaceId) {
+        window.localStorage.setItem('tsim.cloud.workspace-id.v1', workspace.workspaceId);
+        setCloudWorkspaceId(workspace.workspaceId);
+      }
+      setCloud({ status: 'ready', email: session.user.email || '', session, message: workspace.error ? describeCloudError(workspace.error) : workspace.payload ? 'Workspace cloud carregado.' : '' });
+    }
+    hydrate();
+    const { data } = supabase.auth.onAuthStateChange(() => { hydrate(); });
+    return () => { active = false; data.subscription.unsubscribe(); };
+  }, []);
 
   function snapshotScenario() {
     const coverage = calculateCoverage({ ...operations, quantity });
@@ -382,7 +502,9 @@ function App() {
 
   function handleSaveScenario() {
     saveScenario(snapshotScenario());
-    setSavedScenarios(loadSavedScenarios());
+    const nextSavedScenarios = loadSavedScenarios();
+    setSavedScenarios(nextSavedScenarios);
+    syncCloud({ savedScenarios: nextSavedScenarios });
     setSaveMessage('Cenário salvo localmente');
   }
 
@@ -464,7 +586,7 @@ function App() {
         </header>
 
         <div className="content-wrap">
-          {activeView === 'people' ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} onSaveConfiguration={handleSaveConfiguration} onResetConfiguration={handleResetConfiguration} saved={Boolean(window.localStorage.getItem('tsim.configuration.v1'))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} /> : activeView === 'ops' ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' ? <AnalyticsView savedScenarios={savedScenarios} /> : activeView === 'ai' ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' ? <SettingsView configuration={configuration} operations={operations} savedScenarios={savedScenarios} approvals={approvals} onResetConfiguration={handleResetConfiguration} onClearWorkspace={handleClearWorkspace} onRestoreWorkspace={handleRestoreWorkspace} /> : <>
+          {activeView === 'people' ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} onSaveConfiguration={handleSaveConfiguration} onResetConfiguration={handleResetConfiguration} saved={Boolean(window.localStorage.getItem('tsim.configuration.v1'))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} /> : activeView === 'ops' ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' ? <AnalyticsView savedScenarios={savedScenarios} /> : activeView === 'ai' ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' ? <SettingsView configuration={configuration} operations={operations} savedScenarios={savedScenarios} approvals={approvals} cloud={cloud} onCloudSignIn={handleCloudSignIn} onCloudSignUp={handleCloudSignUp} onCloudSignOut={handleCloudSignOut} onResetConfiguration={handleResetConfiguration} onClearWorkspace={handleClearWorkspace} onRestoreWorkspace={handleRestoreWorkspace} /> : <>
           <section className="hero-intro">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> SIMULADOR DE DECISÃO</div>
