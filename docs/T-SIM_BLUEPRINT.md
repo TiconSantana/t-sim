@@ -321,6 +321,6 @@ Ops e Pareceres:
 - Configurações permite recuperar a grade e limpar os dados locais do ambiente demonstrativo.
 - O shell web inclui manifesto PWA, ícone instalável, service worker com fallback offline e configuração de rewrite para hospedagem estática.
 - O deploy público está conectado ao GitHub `TiconSantana/t-sim` e à Vercel `t-sim`.
-- A camada cloud opcional usa Supabase com sessão persistente, login/cadastro no painel e sincronização do workspace na tabela protegida `public.cenario_simulador` do projeto Tconnect.
+- O MVP permanece local: o navegador guarda o workspace em `localStorage` e a tela Configurações permite exportar ou restaurar um backup JSON.
 
-O fallback local continua usando `localStorage` e as exportações locais de parecer são JSON, Excel e impressão/PDF. O usuário precisa autenticar uma conta vinculada ao cadastro Tconnect para ativar a sincronização entre aparelhos; a validação operacional detalhada por região/atividade e a evolução para uma modelagem cloud própria do T-Sim permanecem no roadmap.
+O deploy público serve a mesma aplicação local em `https://t-sim.vercel.app`. Contas e sincronização entre aparelhos ficam fora do escopo desta fase e poderão ser avaliadas depois da validação do simulador.

@@ -24,7 +24,7 @@ O desenho é técnico e funcional. Não representa fibra óptica literalmente e 
 | Logo para fundo escuro | Sidebar e telas com fundo `ink-950` | `public/brand/t-sim-logo-light.svg` |
 | Logo para fundo claro | PDFs, relatórios e fundos brancos | `public/brand/t-sim-logo-dark.svg` |
 | Símbolo | Favicon, avatar, PWA e espaços quadrados | `public/brand/t-sim-mark.svg` |
-| Logos de módulos | Navegação e mapa de visões do workspace | `public/brand/t-sim-{view}.svg` |
+
 
 ## Paleta semântica
 
@@ -34,7 +34,7 @@ O desenho é técnico e funcional. Não representa fibra óptica literalmente e 
 | `ink-900` | `#0A2541` | títulos, painel de cenário e texto forte |
 | `blue-600` | `#1769AA` | ação primária, dados e navegação |
 | `orange-500` | `#E4762D` | decisão, movimento, alerta e foco |
-| `green-600` | `#167D62` | cobertura válida, saldo positivo e sincronização |
+| `green-600` | `#167D62` | cobertura válida, saldo positivo e persistência local |
 | `violet-600` | `#6C5BD4` | análise e indicadores derivados |
 | `paper` | `#F4F7F9` | fundo de trabalho |
 
@@ -52,22 +52,7 @@ As cores das referências externas nunca são copiadas. Estrutura, proporção, 
 - Não inclinar, esticar, trocar o azul estrutural ou aplicar sombra no símbolo.
 - Em fundo escuro, usar `t-sim-logo-light.svg`; em fundo claro, usar `t-sim-logo-dark.svg`.
 - O tagline pode ser omitido abaixo de 160 px de largura e nunca deve ser reduzido a ponto de perder leitura.
-- Módulos usam o mesmo símbolo e uma cor semântica própria; não criar marcas independentes.
 
-## Mapa de módulos
-
-| Visão | Decisão | Cor do módulo |
-|---|---|---|
-| Visão geral | identificar o próximo ponto de decisão | azul |
-| Simulador | escolher movimentação e entender impacto | laranja |
-| People | confirmar base de cargos e elegibilidade | azul |
-| Cenários | comparar alternativas | violeta |
-| Ops | proteger cobertura e SLA | verde |
-| Pareceres | registrar decisão e auditoria | azul |
-| Budget | acompanhar folha e verba | laranja |
-| Analytics | observar custo e indicadores | violeta |
-| T-Sim AI | explicar lacunas e perguntas de validação | verde |
-| Configurações | controlar fontes e persistência | azul |
 
 ## Direção para as telas
 
