@@ -27,7 +27,7 @@
 
 ## Limitações conhecidas
 
-- O projeto mantém o modo local sem login e oferece workspace compartilhado opcional no Tconnect; o deploy público já está ativo.
+- O projeto mantém o modo local sem login, sem sincronização externa e com base isolada por navegador; o deploy público já está ativo.
 - A planilha usa a estrutura e metadados de identidade; o motor `xlsx` não aplica tema cromático às células sem uma camada adicional de escrita de estilos.
 - O build ainda informa avisos do `lucide-react` sobre a diretiva `use client`; eles vêm da dependência e não bloqueiam a entrega visual.
 

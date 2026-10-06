@@ -263,13 +263,13 @@ Aplicar T-Vision Telecom Lab em toda tela, conteúdo e visualização:
 
 ### Fase 0 — Fundação
 
-- Criar projeto, autenticação opcional, organização, banco, migrações, tokens e seed dos seis cargos.
-- Critério: usuário consegue acessar um workspace vazio e importar a base seed.
+- Criar projeto, base local, migrações de referência, tokens e seed dos seis cargos.
+- Critério: usuário consegue acessar um workspace local vazio, baixar a planilha padrão e importar a base seed.
 
 ### Fase 1 — People + motor
 
 - Cadastro de cargos, componentes de custo, posições e premissas.
-- Editor inicial de salários e encargos com persistência local. O workspace compartilhado do Tconnect é opcional e pode ser ativado em Configurações.
+- Editor inicial de salários e encargos com persistência local e planilha padrão para alimentação pelo usuário.
 - Implementar e testar o motor de custo, delta, economia, promoções e saldo.
 - Critério: reproduzir os resultados de referência do cenário Auxiliar → Técnico II com arredondamento documentado.
 
@@ -323,7 +323,7 @@ Ops e Pareceres:
 - Configurações permite recuperar a grade e limpar os dados locais do ambiente demonstrativo.
 - O shell web inclui manifesto PWA, ícone instalável, service worker com fallback offline e configuração de rewrite para hospedagem estática.
 - O deploy público está conectado ao GitHub `TiconSantana/t-sim` e à Vercel `t-sim`.
-- O modo local continua disponível: o navegador guarda o workspace em `localStorage` e a tela Configurações permite exportar ou restaurar um backup JSON. Quando o usuário opta pelo modo compartilhado, o T-Sim grava o payload no Supabase Tconnect.
-- O workspace compartilhado permite criar/carregar o payload, listar membros, atribuir papel de visualizador, revisor ou editor e revogar acessos não proprietários.
+- O navegador guarda o workspace em `localStorage` e a tela Configurações permite exportar ou restaurar um backup JSON.
+- A planilha padrão permite preencher cargos, operação, pessoas, premissas e cenários; cada usuário importa o arquivo no próprio ambiente.
 
-O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O modo local abre sem login. O modo compartilhado opcional usa `tsim_workspace`, `tsim_workspace_member` e `tsim_audit_event` no Supabase Tconnect, com RLS por empresa e papel (`owner`, `editor`, `reviewer`, `viewer`). A auditoria registra autor, operação, versão e payload anterior/novo; a chave `service_role` nunca é enviada ao navegador. Após a confirmação do e-mail, a vinculação da conta ao colaborador ativo é automática quando o e-mail é único.
+O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O modo local abre sem login e sem dependência de serviço externo. Cada navegador mantém sua própria base e pode transportar dados por backup JSON ou pela planilha padrão.

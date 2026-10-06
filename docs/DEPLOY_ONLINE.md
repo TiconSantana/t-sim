@@ -11,12 +11,13 @@ O T-Sim está publicado em [https://t-sim.vercel.app](https://t-sim.vercel.app) 
 - **Persistência local:** cenários, premissas, operações e aprovações ficam no `localStorage` do navegador atual.
 - **Backup manual:** a tela Configurações exporta e restaura um arquivo JSON.
 - **Modo local sem login:** o produto abre direto no simulador e continua funcional sem conta ou conexão externa.
-- **Workspace compartilhado opcional:** a tela Configurações pode conectar uma conta do Supabase Tconnect para salvar e carregar cenários entre aparelhos.
+- **Base própria por usuário:** os dados importados e calculados ficam isolados no navegador do usuário atual.
+- **Planilha padrão:** o arquivo `.xlsx` pode ser baixado em Configurações, Cargos e Operação, preenchido pelo usuário e importado no próprio ambiente.
 
 ## Publicação
 
 Cada atualização enviada para a branch `main` gera um novo deploy automático na Vercel. O build de produção é executado com `pnpm build`.
 
-## Próxima evolução
+## Limite atual
 
-O banco compartilhado já está preparado no Tconnect. Depois da confirmação do e-mail, o T-Sim tenta vincular automaticamente a conta ao único registro ativo de `public.colaborador` com o mesmo e-mail. Se não houver correspondência única, o sistema bloqueia o acesso compartilhado e informa o motivo.
+O deploy público disponibiliza a aplicação em qualquer aparelho conectado, mas cada navegador mantém sua própria base local. Para levar dados a outro aparelho, exporte o backup JSON ou a planilha preenchida e importe no novo ambiente. Uma base online própria do T-Sim pode ser adicionada futuramente como uma evolução separada.
