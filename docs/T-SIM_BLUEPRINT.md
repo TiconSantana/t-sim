@@ -263,7 +263,7 @@ Aplicar T-Vision Telecom Lab em toda tela, conteúdo e visualização:
 
 ### Fase 0 — Fundação
 
-- Criar projeto, autenticação, organização, banco, migrações, tokens e seed dos seis cargos.
+- Criar projeto, autenticação opcional, organização, banco, migrações, tokens e seed dos seis cargos.
 - Critério: usuário consegue acessar um workspace vazio e importar a base seed.
 
 ### Fase 1 — People + motor
@@ -324,5 +324,6 @@ Ops e Pareceres:
 - O shell web inclui manifesto PWA, ícone instalável, service worker com fallback offline e configuração de rewrite para hospedagem estática.
 - O deploy público está conectado ao GitHub `TiconSantana/t-sim` e à Vercel `t-sim`.
 - O modo local continua disponível: o navegador guarda o workspace em `localStorage` e a tela Configurações permite exportar ou restaurar um backup JSON. Quando o usuário opta pelo modo compartilhado, o T-Sim grava o payload no Supabase Tconnect.
+- O workspace compartilhado permite criar/carregar o payload, listar membros, atribuir papel de visualizador, revisor ou editor e revogar acessos não proprietários.
 
 O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O modo local abre sem login. O modo compartilhado opcional usa `tsim_workspace`, `tsim_workspace_member` e `tsim_audit_event` no Supabase Tconnect, com RLS por empresa e papel (`owner`, `editor`, `reviewer`, `viewer`). A auditoria registra autor, operação, versão e payload anterior/novo; a chave `service_role` nunca é enviada ao navegador.
