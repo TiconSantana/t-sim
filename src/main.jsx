@@ -140,7 +140,7 @@ function PeopleView({ cargoList, encargos, onSaveConfiguration, onResetConfigura
         if (!id) return;
         const index = nextCargos.findIndex((cargo) => cargo.id === id);
         if (index >= 0) {
-          nextCargos[index] = { ...nextCargos[index], salary: rawValue };
+          nextCargos[index] = { ...nextCargos[index], salary: rawValue, source: 'Planilha importada localmente · revisar origem', validity: 'Vigência a confirmar' };
           found += 1;
         }
       });
@@ -162,7 +162,7 @@ function PeopleView({ cargoList, encargos, onSaveConfiguration, onResetConfigura
     <>
       <section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> BASE DE PESSOAS</div><h1>Conheça a sua<br /><em>estrutura.</em></h1><p>Edite a grade salarial e os encargos de referência. As alterações salvas alimentam imediatamente o simulador e os cenários.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Fonte ativa</div><strong>RH / Controladoria</strong><span>{saved ? 'Configuração local salva' : 'Grade salarial · versão 1.4'}</span><button onClick={() => setMessage('Fonte de referência: arquivos de análise gerencial fornecidos para o T-Sim.')}>Ver origem <ChevronRight size={14} /></button></div></section>
       <section className="metric-grid"><Metric label="Cargos cadastrados" value={draftCargos.length} detail="níveis de fibra óptica" tone="blue" icon={Layers3} /><Metric label="Custo mensal total" value={money(totalMonthly)} detail="salário + encargos configurados" tone="green" icon={BarChart3} /><Metric label="Amplitude salarial" value={`${Math.round((draftCargos.at(-1).salary / Math.max(1, draftCargos[0].salary) - 1) * 100)}%`} detail="entre nível I e nível VI" tone="violet" icon={ArrowUpRight} /><Metric label="Premissa de encargos" value={`${draftEncargos}%`} detail="editável · aplicada no simulador" tone="orange" icon={ClipboardCheck} /></section>
-      <section className="panel-surface assumptions-editor"><div className="assumptions-editor-title"><div><span className="section-index">01</span><div><h2>Premissas salariais</h2><p>Valores de referência editáveis. O custo empresa é recalculado automaticamente.</p></div></div><div className="editor-toolbar"><input ref={fileInputRef} hidden type="file" accept=".xlsx,.xls,.csv" onChange={importSpreadsheet} /><button className="secondary-button" onClick={() => fileInputRef.current?.click()}>Importar planilha</button><label className="encargo-field"><span>Encargos (%)</span><input aria-label="Percentual de encargos" type="number" min="0" step="0.1" value={draftEncargos} onChange={(event) => setDraftEncargos(Math.max(0, Number(event.target.value) || 0))} /></label></div></div><div className="people-table-wrap"><table className="people-table editable-table"><thead><tr><th>Cargo</th><th>Nível</th><th>Salário base editável</th><th>Encargos</th><th>Custo empresa / mês</th><th>Fonte</th></tr></thead><tbody>{draftCargos.map((cargo) => { const total = custo(cargo, draftEncargos / 100); return <tr key={cargo.id}><td><strong>{cargo.name}</strong><small>{cargo.short}</small></td><td><span className={`level-tag level-${cargo.tone}`}>{cargo.level}</span></td><td><label className="salary-input"><span>R$</span><input aria-label={`Salário base ${cargo.short}`} type="number" min="0" step="0.01" value={cargo.salary} onChange={(event) => updateSalary(cargo.id, event.target.value)} /></label></td><td>{money(total - cargo.salary)}</td><td><strong>{money(total)}</strong></td><td><span className="source-type">Informado</span></td></tr>; })}</tbody></table></div><div className="editor-actions"><div><strong>{importMessage || message || (hasChanges ? 'Há alterações ainda não salvas.' : 'Premissas vinculadas à fonte de referência.')}</strong><span>Salvamento local neste navegador</span></div><div><button className="secondary-button" onClick={resetChanges}>Restaurar referência</button><button className="primary-button editor-save" onClick={saveChanges} disabled={!hasChanges}>Salvar premissas</button></div></div></section>
+      <section className="panel-surface assumptions-editor"><div className="assumptions-editor-title"><div><span className="section-index">01</span><div><h2>Premissas salariais</h2><p>Valores de referência editáveis. O custo empresa é recalculado automaticamente.</p></div></div><div className="editor-toolbar"><input ref={fileInputRef} hidden type="file" accept=".xlsx,.xls,.csv" onChange={importSpreadsheet} /><button className="secondary-button" onClick={() => fileInputRef.current?.click()}>Importar planilha</button><label className="encargo-field"><span>Encargos (%)</span><input aria-label="Percentual de encargos" type="number" min="0" step="0.1" value={draftEncargos} onChange={(event) => setDraftEncargos(Math.max(0, Number(event.target.value) || 0))} /></label></div></div><div className="people-table-wrap"><table className="people-table editable-table"><thead><tr><th>Cargo</th><th>Nível</th><th>Salário base editável</th><th>Encargos</th><th>Custo empresa / mês</th><th>Fonte e vigência</th></tr></thead><tbody>{draftCargos.map((cargo) => { const total = custo(cargo, draftEncargos / 100); return <tr key={cargo.id}><td><strong>{cargo.name}</strong><small>{cargo.short}</small></td><td><span className={`level-tag level-${cargo.tone}`}>{cargo.level}</span></td><td><label className="salary-input"><span>R$</span><input aria-label={`Salário base ${cargo.short}`} type="number" min="0" step="0.01" value={cargo.salary} onChange={(event) => updateSalary(cargo.id, event.target.value)} /></label></td><td>{money(total - cargo.salary)}</td><td><strong>{money(total)}</strong></td><td><span className="source-type">{cargo.source || 'Base de referência'}</span><small className="source-validity">{cargo.validity || 'Vigência a confirmar'}</small></td></tr>; })}</tbody></table></div><div className="editor-actions"><div><strong>{importMessage || message || (hasChanges ? 'Há alterações ainda não salvas.' : 'Premissas vinculadas à fonte de referência.')}</strong><span>Salvamento local neste navegador</span></div><div><button className="secondary-button" onClick={resetChanges}>Restaurar referência</button><button className="primary-button editor-save" onClick={saveChanges} disabled={!hasChanges}>Salvar premissas</button></div></div></section>
       <section className="people-grid people-insight-row"><aside className="panel-surface people-side-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Leitura da grade</h2><p>Indicadores recalculados</p></div></div></div><div className="grade-insights"><div><span>Menor salário base</span><strong>{money(draftCargos[0].salary)}</strong><small>{draftCargos[0].name}</small></div><div><span>Maior salário base</span><strong>{money(draftCargos.at(-1).salary)}</strong><small>{draftCargos.at(-1).name}</small></div><div><span>Maior salto entre níveis</span><strong>{money(draftCargos[1].salary - draftCargos[0].salary)}</strong><small>Auxiliar → Técnico II</small></div></div></aside><div className="panel-note people-note"><ClipboardCheck size={16} /><span>Configuração provisória em armazenamento local. Benefícios, ADM, BDI e custos de operação permanecem para o módulo Budget. Valores de RH devem ser validados antes de aprovação.</span></div></section>
     </>
   );
@@ -215,6 +215,10 @@ function ReportsView({ savedScenarios, approvals, onApproval, onGoScenarios, cur
       'Promoções automáticas': scenario.automaticPromotions,
       'Promoções aplicadas': scenario.appliedPromotions,
       'Saldo mensal': scenario.appliedBalance,
+      'Saldo anual': scenario.appliedAnnualBalance ?? scenario.appliedBalance * 12,
+      'Delta por promoção': scenario.delta,
+      'Cobertura após movimento (%)': scenario.operationalCoverage,
+      Elegibilidade: scenario.promotionBlocked ? 'Bloqueada' : 'Elegível',
       Encargos: scenario.encargos,
       Fonte: scenario.source,
       Status: approvals[scenario.id]?.status || 'Rascunho',
@@ -355,6 +359,9 @@ function App() {
       operationalCoverage: coverage.afterMovement,
       approvalBlocked: coverage.approvalBlocked,
       budgetBlocked: calc.appliedBalance < 0,
+      promotionBlocked: !calc.promotionEligible,
+      delta: calc.delta,
+      appliedAnnualBalance: calc.appliedAnnualBalance,
       encargos: configuredEncargos,
       salarySnapshot: configuredCargos.map(({ id, salary }) => ({ id, salary })),
       source: 'MVP local',
@@ -380,6 +387,7 @@ function App() {
   }
 
   const recommendationLabel = manualMode ? 'Ajuste manual' : activeScenario === 'conservative' ? 'Conservador' : activeScenario === 'aggressive' ? 'Agressivo' : 'Equilibrado';
+  const appliedScenarioLabel = manualMode ? 'ajuste manual' : activeScenario === 'conservative' ? 'conservador' : activeScenario === 'aggressive' ? 'agressivo' : 'equilibrado';
   const recommendationText = calc.appliedBalance < 0
     ? 'O saldo ficou negativo. Reduza promoções ou valide uma fonte orçamentária adicional antes de aprovar.'
     : manualMode
@@ -540,7 +548,7 @@ function App() {
             <div className="insight-panel panel-surface">
               <div className="panel-heading compact"><div><span className="section-index">04</span><div><h2>Leitura para aprovação</h2><p>O que muda quando você executa este cenário</p></div></div></div>
               <div className="insight-list">
-                <div className="insight-item"><span className="insight-number">01</span><div><strong>Caixa preservado</strong><p>O cenário {activeScenario === 'conservative' ? 'conservador' : activeScenario === 'aggressive' ? 'agressivo' : 'equilibrado'} deixa <b>{money(calc.balance)}</b> de saldo mensal após as movimentações.</p></div></div>
+                <div className="insight-item"><span className="insight-number">01</span><div><strong>Caixa preservado</strong><p>O cenário {appliedScenarioLabel} deixa <b>{money(calc.appliedBalance)}</b> de saldo mensal após as movimentações.</p></div></div>
                 <div className="insight-item"><span className="insight-number">02</span><div><strong>Progressão com rastreabilidade</strong><p>A diferença entre {calc.origin.short} e {calc.destination.short} é de <b>{money(calc.delta)}</b> por pessoa, já com encargos.</p></div></div>
                 <div className="insight-item"><span className="insight-number">03</span><div><strong>Cobertura operacional</strong><p>Risco projetado <span className={`risk-pill risk-${calc.operationalRisk.toLowerCase()}`}>{calc.operationalRisk}</span>. Valide SLA e elegibilidade antes de aprovar.</p></div></div>
               </div>

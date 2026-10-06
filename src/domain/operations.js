@@ -18,17 +18,21 @@ export function validateScenarioForApproval({ scenario, coverage }) {
   const missingSource = !scenario?.source;
   const insufficientCoverage = coverage?.approvalBlocked || scenario?.approvalBlocked;
   const insufficientBudget = scenario?.budgetBlocked || Number(scenario?.appliedBalance) < 0;
+  const ineligiblePromotion = scenario?.promotionBlocked;
   return {
-    valid: !missingSource && !insufficientCoverage && !insufficientBudget,
+    valid: !missingSource && !insufficientCoverage && !insufficientBudget && !ineligiblePromotion,
     missingSource,
     insufficientCoverage: Boolean(insufficientCoverage),
     insufficientBudget: Boolean(insufficientBudget),
+    ineligiblePromotion: Boolean(ineligiblePromotion),
     message: missingSource
       ? 'Fonte da premissa não informada.'
       : insufficientCoverage
         ? 'Cobertura operacional abaixo do SLA alvo.'
         : insufficientBudget
           ? 'Saldo mensal negativo: ajuste as promoções antes de aprovar.'
+        : ineligiblePromotion
+          ? 'Cargo de destino sem elegibilidade para progressão.'
         : '',
   };
 }
