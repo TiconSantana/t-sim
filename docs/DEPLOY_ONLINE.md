@@ -13,6 +13,7 @@ O T-Sim está publicado em [https://t-sim.vercel.app](https://t-sim.vercel.app) 
 - **Modo local sem login:** o produto abre direto no simulador e continua funcional sem conta ou conexão externa.
 - **Base própria por usuário:** os dados importados e calculados ficam isolados no navegador do usuário atual.
 - **Planilha padrão:** o arquivo `.xlsx` pode ser baixado em Configurações, Cargos e Operação, preenchido pelo usuário e importado no próprio ambiente.
+- **Variáveis externas:** nenhuma variável de Supabase ou TConnect é necessária no projeto Vercel.
 
 ## Publicação
 
