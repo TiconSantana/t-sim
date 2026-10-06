@@ -1,6 +1,6 @@
 # T-Sim — Diretrizes de identidade visual
 
-**Versão:** 1.0 · **Vigência:** 05/10/2026 · **Responsável:** Produto T-Sim / TConnect
+**Versão:** 1.1 · **Vigência:** 06/10/2026 · **Responsável:** Produto T-Sim / TConnect
 
 ## Ideia central
 
@@ -24,6 +24,10 @@ O desenho é técnico e funcional. Não representa fibra óptica literalmente e 
 | Logo para fundo escuro | Sidebar e telas com fundo `ink-950` | `public/brand/t-sim-logo-light.svg` |
 | Logo para fundo claro | PDFs, relatórios e fundos brancos | `public/brand/t-sim-logo-dark.svg` |
 | Símbolo | Favicon, avatar, PWA e espaços quadrados | `public/brand/t-sim-mark.png` (aplicação atual); `public/brand/t-sim-mark.svg` como fallback |
+| Símbolo sobre fundo claro | Avatar, relatório e instalação em superfícies claras | `public/brand/t-sim-mark-on-light.svg` |
+| Símbolo sobre fundo escuro | Favicon, sidebar, avatar e instalação em superfícies escuras | `public/brand/t-sim-mark-on-dark.svg` / `public/brand/t-sim-favicon.svg` |
+| Assinatura vertical clara | Apresentação institucional, onboarding e fundos claros | `public/brand/t-sim-lockup-stacked-light.svg` |
+| Assinatura vertical escura | Login, capa institucional e fundos escuros | `public/brand/t-sim-lockup-stacked-dark.svg` |
 
 
 ## Paleta semântica
@@ -52,6 +56,8 @@ As cores das referências externas nunca são copiadas. Estrutura, proporção, 
 - Não inclinar, esticar, trocar o azul estrutural ou aplicar sombra no símbolo.
 - Em fundo escuro, usar `t-sim-logo-light.svg`; em fundo claro, usar `t-sim-logo-dark.svg`.
 - O tagline pode ser omitido abaixo de 160 px de largura e nunca deve ser reduzido a ponto de perder leitura.
+- A arte cromada `t-sim-logo-header.png` é a assinatura expressiva principal; as versões SVG são alternativas escaláveis para impressão, instalação e fundos controlados.
+- O favicon usa somente o símbolo, sem texto, para preservar leitura em 16–32 px.
 
 
 ## Direção para as telas

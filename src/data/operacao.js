@@ -6,8 +6,8 @@ export const operationalCosts = [
     label: 'Campo FTTH',
     context: 'Controle Local FTTH',
     monthlyCost: 648972.87,
-    headcount: 609,
-    unitCost: 1065.63,
+    headcount: 672,
+    unitCost: 965.73,
     unit: 'R$/HC/mês',
     classification: 'Informada',
     validity: 'Abr/2025',
@@ -19,7 +19,7 @@ export const operationalCosts = [
     context: 'Sala Ténica',
     monthlyCost: 107885.07,
     headcount: 10,
-    unitCost: 177.15,
+    unitCost: 160.54,
     unit: 'R$/HC/mês',
     classification: 'Calculada',
     validity: 'Abr/2025',
@@ -31,7 +31,7 @@ export const operationalCosts = [
     context: 'Sala Ténica',
     monthlyCost: 178339.20,
     headcount: 14,
-    unitCost: 292.84,
+    unitCost: 265.39,
     unit: 'R$/HC/mês',
     classification: 'Calculada',
     validity: 'Abr/2025',
@@ -43,7 +43,7 @@ export const operationalCosts = [
     context: 'Sala Ténica',
     monthlyCost: 296030.44,
     headcount: 21,
-    unitCost: 486.09,
+    unitCost: 440.52,
     unit: 'R$/HC/mês',
     classification: 'Calculada',
     validity: 'Abr/2025',
@@ -52,9 +52,9 @@ export const operationalCosts = [
 ];
 
 export const teamClasses = [
-  { id: 'f', label: 'Classe F', headcount: 509, teamCount: 254.5, unitCost: 17954.75, unit: 'R$/equipe/mês', classification: 'Calculada', validity: 'Abr/2025', source: 'Custos Equipes · Controle Local' },
-  { id: 'l', label: 'Classe L', headcount: 48, teamCount: 16, unitCost: 13022.96, unit: 'R$/equipe/mês', classification: 'Calculada', validity: 'Abr/2025', source: 'Custos Equipes · Controle Local' },
-  { id: 'mini-l', label: 'Classe Mini L', headcount: 52, teamCount: 26, unitCost: 11084.69, unit: 'R$/equipe/mês', classification: 'Calculada', validity: 'Abr/2025', source: 'Custos Equipes · Controle Local' },
+  { id: 'f', label: 'Classe F', headcount: 558, teamCount: 279, unitCost: 17954.75, unit: 'R$/equipe/mês', classification: 'Calculada', validity: 'Abr/2025', source: 'Custos Equipes · distribuição orçada' },
+  { id: 'l', label: 'Classe L', headcount: 12, teamCount: 4, unitCost: 13022.96, unit: 'R$/equipe/mês', classification: 'Calculada', validity: 'Abr/2025', source: 'Custos Equipes · distribuição orçada' },
+  { id: 'mini-l', label: 'Classe Mini L', headcount: 102, teamCount: 51, unitCost: 11084.69, unit: 'R$/equipe/mês', classification: 'Calculada', validity: 'Abr/2025', source: 'Custos Equipes · distribuição orçada' },
 ];
 
 export const costAssumptions = [
@@ -69,9 +69,19 @@ export const operationalSource = {
   version: 'Abr/2025',
   owner: 'Controladoria / Operações',
   headcountBases: [
-    { id: 'controle-local', label: 'Controle Local FTTH', headcount: 609, basis: 'Rateio de sala técnica e estrutura operacional', classification: 'Informada' },
-    { id: 'custos-equipes', label: 'Custos Equipes · orçado', headcount: 672, basis: 'Distribuição orçada da aba Custos Equipes', classification: 'Informada' },
+    { id: 'custos-equipes', label: 'Custos Equipes · oficial', headcount: 672, basis: 'Distribuição orçada da aba Custos Equipes', classification: 'Informada' },
+    { id: 'controle-local', label: 'Controle Local FTTH · comparação', headcount: 609, basis: 'Base alternativa da aba Controle Local', classification: 'Informada' },
   ],
-  reconciliation: 'Pendente: as bases 609 e 672 HC não devem ser somadas sem validação da Controladoria.',
+  reconciliation: 'Base operacional oficial: 672 HC. Os 609 HC do Controle Local permanecem como comparação e não são somados.',
   note: 'Valores de custo operacional permanecem separados da simulação simplificada de cargos.',
+};
+
+export const operationsDefaults = {
+  teamHeadcount: 672,
+  requiredHeadcount: 672,
+  slaTarget: 95,
+  safetyBuffer: 10,
+  basisId: 'custos-equipes-672',
+  basisVersion: 'Abr/2025',
+  basisSource: 'Cópia de Custos e Preço V3 · Custos Equipes',
 };

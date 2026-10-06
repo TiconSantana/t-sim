@@ -12,7 +12,7 @@
   "theme_color": "#09233f",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/brand/t-sim-favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

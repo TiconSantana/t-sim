@@ -55,10 +55,26 @@ export function loadOperations(defaults) {
   if (!canUseStorage()) return defaults;
   try {
     const stored = window.localStorage.getItem(OPS_KEY);
-    return stored ? { ...defaults, ...JSON.parse(stored) } : defaults;
+    if (!stored) return defaults;
+    return normalizeOperations(JSON.parse(stored), defaults);
   } catch {
     return defaults;
   }
+}
+
+export function normalizeOperations(value, defaults) {
+  const merged = { ...defaults, ...(value || {}) };
+  if (merged.basisId !== defaults.basisId) {
+    return {
+      ...merged,
+      teamHeadcount: defaults.teamHeadcount,
+      requiredHeadcount: defaults.requiredHeadcount,
+      basisId: defaults.basisId,
+      basisVersion: defaults.basisVersion,
+      basisSource: defaults.basisSource,
+    };
+  }
+  return merged;
 }
 
 export function saveOperations(operations) {

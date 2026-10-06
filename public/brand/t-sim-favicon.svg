@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="title desc">
+  <title id="title">T-Sim · favicon</title>
+  <desc id="desc">Símbolo T-Sim para abas, atalhos e instalações.</desc>
+  <rect width="120" height="120" rx="28" fill="#071B30"/>
+  <path d="M19 22h67v14H62v50H45V36H19z" fill="#EAF4FA"/>
+  <path d="M68 56c0-11 9-20 22-20 6 0 11 2 15 5v14c-4-3-8-5-13-5-5 0-8 2-8 5 0 3 2 4 8 6 10 3 15 8 15 16 0 11-9 19-23 19-6 0-12-2-16-4V78c5 3 9 4 14 4 4 0 7-2 7-5 0-3-2-4-8-6-9-3-13-7-13-15z" fill="#E4762D"/>
+  <circle cx="96" cy="22" r="7" fill="#44D3A1"/>
+  <path d="M96 22l-11 18" fill="none" stroke="#44D3A1" stroke-width="3" stroke-linecap="round" opacity=".78"/>
+</svg>
