@@ -64,7 +64,7 @@ export function loadOperations(defaults) {
 
 export function normalizeOperations(value, defaults) {
   const merged = { ...defaults, ...(value || {}) };
-  if (merged.basisId !== defaults.basisId) {
+  if (value?.basisId !== defaults.basisId) {
     return {
       ...merged,
       teamHeadcount: defaults.teamHeadcount,

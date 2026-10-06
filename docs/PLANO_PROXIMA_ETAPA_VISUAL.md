@@ -46,6 +46,38 @@ motor de cálculo e a separação entre domínio e interface.
 
 **Saída:** página institucional acessível dentro do projeto, separada do workspace operacional.
 
+## Contratos das novas telas
+
+### Acesso local
+
+- **Objetivo:** explicar o ambiente disponível e abrir o fluxo local.
+- **Decisão:** continuar no ambiente Base T-Sim · Bahia.
+- **Público:** RH, Controladoria, Operações e Diretoria em avaliação do MVP.
+- **Dados e fonte:** nome do ambiente e indicação de persistência local; nenhum dado financeiro é criado nesta tela.
+- **Estados:** padrão, foco, tema claro/escuro e viewport mobile.
+- **Acessibilidade:** campo somente leitura identificado, botão com nome acessível e foco visível.
+- **Limitação:** não representa autenticação de produção nem envia dados externos.
+
+### Onboarding
+
+- **Objetivo:** preparar o usuário para a sequência de decisão do T-Sim.
+- **Decisão:** abrir o workspace depois de reconhecer base, premissas e simulação.
+- **Público:** primeira visita ou usuário que revisita o ambiente local.
+- **Dados e fonte:** fluxo editorial baseado no Blueprint; sem valores financeiros novos.
+- **Estados:** três passos, retorno ao acesso, tema claro/escuro e viewport mobile.
+- **Acessibilidade:** ordem semântica de títulos, botões acionáveis e textos editáveis.
+- **Limitação:** a conclusão é registrada apenas como preferência local do navegador.
+
+### Apresentação institucional
+
+- **Objetivo:** explicar o produto e os módulos antes do uso operacional.
+- **Decisão:** abrir o simulador a partir da proposta de valor.
+- **Público:** Diretoria, parceiros e novos usuários do T-Sim.
+- **Dados e fonte:** módulos e princípios do Blueprint; mockup é representação visual didática.
+- **Estados:** carregado, tema claro/escuro, responsivo e CTA para o simulador.
+- **Acessibilidade:** imagem com texto alternativo, CTA identificado e conteúdo textual equivalente.
+- **Limitação:** não substitui documentação técnica, fonte de dados ou parecer de aprovação.
+
 ### Fase 5 — Revisão e aprovação
 
 - Conferir visualmente os temas claro e escuro.
