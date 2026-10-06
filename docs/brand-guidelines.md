@@ -1,6 +1,10 @@
 # T-Sim — Diretrizes de identidade visual
 
-**Versão:** 1.1 · **Vigência:** 06/10/2026 · **Responsável:** Produto T-Sim / TConnect
+**Versão:** 1.2 · **Vigência:** 06/10/2026 · **Responsável:** Produto T-Sim / TConnect
+
+**Status:** pacote visual aprovado pelo responsável do projeto em 06/10/2026. Os ativos canônicos
+em `public/brand/` e o conteúdo institucional desta versão podem ser usados no frontend e na
+publicação do MVP.
 
 ## Ideia central
 

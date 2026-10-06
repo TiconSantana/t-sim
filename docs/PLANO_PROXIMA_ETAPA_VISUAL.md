@@ -10,7 +10,7 @@ motor de cálculo e a separação entre domínio e interface.
 
 ## Sequência de entrega
 
-**Status atual:** Fases 1–5 concluídas em versão de trabalho; validação registrada em `docs/VISUAL_QA_TSIM.md`.
+**Status atual:** Fases 1–5 concluídas; pacote visual e página institucional aprovados pelo responsável em 06/10/2026. Validação registrada em `docs/VISUAL_QA_TSIM.md`.
 
 ### Fase 1 — Sistema de marca e ícones
 
@@ -89,16 +89,16 @@ motor de cálculo e a separação entre domínio e interface.
 
 **Saída:** `docs/VISUAL_QA_TSIM.md`, revisão de exportações, impressão/PDF, shell offline e acessibilidade de navegação.
 
-## Decisões que precisam de aprovação
+## Registro de aprovação
 
-Não é necessário aprovar a criação dos rascunhos ou a organização dos arquivos. Vou pedir aprovação
-somente nestes pontos:
+O responsável aprovou em 06/10/2026:
 
-1. **Pacote final da marca:** escolher a versão definitiva da logo principal e das versões auxiliares.
-2. **Texto de login/onboarding:** validar nome do ambiente, assinatura e tom da primeira experiência.
-3. **Publicação institucional:** aprovar o conteúdo e a chamada final antes de usá-la como página pública.
+- **Pacote final da marca:** logo principal, símbolo, favicon, variantes de fundo claro/escuro e assinaturas verticais.
+- **Texto de login/onboarding:** nome do ambiente, assinatura e tom da primeira experiência.
+- **Publicação institucional:** conteúdo, mockup e chamada para o simulador.
 
-Até esses checkpoints, os arquivos serão tratados como versões de trabalho identificadas por versão.
+Os arquivos canônicos em `public/brand/` e a página `Apresentação` passam a ser a referência visual
+aprovada do MVP.
 
 ## Critérios de conclusão
 

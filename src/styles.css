@@ -498,6 +498,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 html[data-theme="dark"] .dimension-table td input { background: #08131f; color: var(--ink-950); border-color: var(--ink-200); }
 
+.cloud-panel { margin-top: 18px; }
+.cloud-auth-form, .cloud-session { display: grid; gap: 14px; max-width: 720px; }
+.cloud-form-copy { display: grid; gap: 4px; }
+.cloud-form-copy span, .cloud-session > div span { color: var(--ink-500); font-size: 12px; line-height: 1.5; }
+.cloud-auth-form label, .cloud-session label { display: grid; gap: 6px; color: var(--ink-700); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.cloud-auth-form input, .cloud-session input { width: 100%; min-height: 42px; border: 1px solid var(--ink-200); border-radius: 9px; padding: 10px 12px; background: var(--surface); color: var(--ink-950); font: inherit; font-size: 13px; letter-spacing: normal; text-transform: none; }
+.cloud-auth-form input:focus, .cloud-session input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px var(--focus-ring); outline: none; }
+.cloud-form-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
 /* OLED theme: same information architecture, different working light. */
 html[data-theme="dark"] {
   color-scheme: dark;
@@ -533,7 +542,7 @@ html[data-theme="dark"] .help-button, html[data-theme="dark"] .theme-toggle, htm
 html[data-theme="dark"] .panel-surface, html[data-theme="dark"] .metric, html[data-theme="dark"] .simulator-panel, html[data-theme="dark"] .scenario-panel, html[data-theme="dark"] .secondary-button { background: linear-gradient(145deg, rgba(17, 31, 46, .97), rgba(10, 22, 34, .97)); border-color: var(--ink-100); }
 html[data-theme="dark"] .metric { box-shadow: var(--shadow-soft); }
 html[data-theme="dark"] .panel-note, html[data-theme="dark"] .empty-state, html[data-theme="dark"] .overview-empty { background: rgba(4, 14, 24, .72); border-color: var(--ink-100); }
-html[data-theme="dark"] .field input, html[data-theme="dark"] .field select, html[data-theme="dark"] .ops-fields input, html[data-theme="dark"] .assumptions-editor input, html[data-theme="dark"] select, html[data-theme="dark"] textarea { background: #08131f; color: var(--ink-950); border-color: var(--ink-200); }
+html[data-theme="dark"] .field input, html[data-theme="dark"] .field select, html[data-theme="dark"] .ops-fields input, html[data-theme="dark"] .assumptions-editor input, html[data-theme="dark"] .cloud-auth-form input, html[data-theme="dark"] .cloud-session input, html[data-theme="dark"] select, html[data-theme="dark"] textarea { background: #08131f; color: var(--ink-950); border-color: var(--ink-200); }
 html[data-theme="dark"] .workspace-select { background: linear-gradient(135deg, rgba(76, 204, 255, .12), rgba(255,255,255,.035)); }
 html[data-theme="dark"] .hero-intro > div:first-child > p, html[data-theme="dark"] .hero-aside-label, html[data-theme="dark"] .hero-aside > span { color: var(--ink-500); }
 html[data-theme="dark"] h1, html[data-theme="dark"] h2, html[data-theme="dark"] h3 { color: var(--ink-950); }

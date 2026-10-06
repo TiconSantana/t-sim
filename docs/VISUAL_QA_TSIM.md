@@ -22,14 +22,17 @@
 | `git diff --check` | Passou; somente avisos de normalização CRLF do Git |
 | Preview local | Navegação, Budget, Pareceres, tema e skip link conferidos no navegador |
 | Fluxos visuais | Acesso local, onboarding e Apresentação já conferidos nesta etapa |
+| Primeira visita | A aplicação abre direto no workspace local; o acesso compartilhado fica em Configurações |
 | Responsividade | Breakpoints de sidebar, hero, grades e entrada revisados no CSS |
 
 ## Limitações conhecidas
 
-- O projeto segue como MVP local: autenticação e persistência remota não fazem parte desta pauta; o deploy público já está ativo.
+- O projeto mantém o modo local sem login e oferece workspace compartilhado opcional no Tconnect; o deploy público já está ativo.
 - A planilha usa a estrutura e metadados de identidade; o motor `xlsx` não aplica tema cromático às células sem uma camada adicional de escrita de estilos.
-- O warning de chunk acima de 500 kB é de otimização futura e não bloqueia a entrega visual.
+- O build ainda informa avisos do `lucide-react` sobre a diretiva `use client`; eles vêm da dependência e não bloqueiam a entrega visual.
 
-## Estado
+## Estado aprovado
 
-A revisão visual foi registrada como concluída para a versão de trabalho. A marca, os textos e a página institucional permanecem editáveis no repositório.
+A revisão visual foi aprovada pelo responsável em 06/10/2026. A marca, os textos e a página
+institucional passam a ser a referência visual do MVP e continuam editáveis no repositório para
+evoluções futuras.

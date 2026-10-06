@@ -36,6 +36,7 @@ import { costAssumptions, operationalCosts, operationalSource, operationsDefault
 import { calculateSimulation } from './domain/simulation';
 import { calculateCoverage, calculateDimensionCoverage, validateScenarioForApproval } from './domain/operations';
 import { loadApprovals, loadConfiguration, loadOperations, loadSavedScenarios, normalizeOperations, saveApproval, saveConfiguration, saveOperations, saveScenario } from './storage/scenarios';
+import { cloudConfig, createCloudWorkspace, getCloudSession, listCloudWorkspaces, signInCloud, signOutCloud, signUpCloud, supabase, updateCloudWorkspace } from './integrations/supabase';
 import './styles.css';
 
 const navItems = [
@@ -388,14 +389,24 @@ function AnalyticsView({ savedScenarios }) {
   return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> ANALYTICS</div><h1>Custos e operação<br /><em>na mesma leitura.</em></h1><p>Use os dados operacionais da planilha de custos para contextualizar a decisão de pessoas e identificar concentração de impacto.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Fonte operacional</div><strong>V.TAL · 2025</strong><span>Custos Equipes, Controle Local e sala técnica</span><button onClick={() => setSourceMessage('Fonte: Cópia de Custos e Preço V3 · Encargos atualizados')}>Ver fonte <ChevronRight size={14} /></button>{sourceMessage && <small className="source-message">{sourceMessage}</small>}</div></section><section className="metric-grid"><Metric label="Custo operacional mensal" value={money(totalOperational)} detail="base de referência · / mês" tone="blue" icon={BarChart3} /><Metric label="HC base operacional" value={rateioHeadcount} detail="Custos Equipes · base oficial" tone="violet" icon={UsersRound} /><Metric label="HC Controle Local" value={comparisonHeadcount} detail={`comparação · diferença de ${headcountDifference} HC`} tone="orange" icon={TriangleAlert} /><Metric label="Cenários disponíveis" value={savedScenarios.length} detail="para cruzar com operação" tone="green" icon={Layers3} /></section><section className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Custos por contexto</h2><p>Valores mensais de referência da fonte operacional</p></div></div><span className="source-chip"><span /> Fonte rastreada</span></div><div className="analytics-bars">{operationalCosts.map((item) => <div className="analytics-bar-row" key={item.id}><div className="analytics-bar-label"><strong>{item.label}</strong><small>{item.headcount} HC informado · {item.classification} · {item.validity} · {item.source}</small></div><div className="analytics-track"><span style={{ width: `${(item.monthlyCost / maxCost) * 100}%` }} /></div><b>{money(item.monthlyCost, true)}<small className="metric-unit"> / mês</small></b></div>)}</div><div className="panel-note"><Database size={16} /><span>{operationalSource.reconciliation} O rateio operacional e a cobertura usam {rateioHeadcount} HC.</span></div></section><section className="analytics-grid"><div className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Classes de equipe</h2><p>Custo de referência por equipe · mês</p></div></div></div><div className="class-table">{teamClasses.map((item) => <div key={item.id}><strong>{item.label}</strong><span>{item.headcount} HC · {item.teamCount} equipes · {item.classification} · {item.validity}</span><b>{money(item.unitCost)}<small className="metric-unit"> / equipe</small></b></div>)}</div></div><div className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Leitura executiva</h2><p>Pontos para validação</p></div></div></div><div className="insight-list analytics-insights"><div className="insight-item"><span className="insight-number">01</span><div><strong>Contextos não devem ser misturados</strong><p>A grade de cargos usa 113% de encargos; a operação usa 128%, ADM e BDI próprios.</p></div></div><div className="insight-item"><span className="insight-number">02</span><div><strong>Base operacional definida</strong><p>O T-Sim usa 672 HC de Custos Equipes para cobertura e rateio. Os 609 HC do Controle Local ficam como referência comparativa.</p></div></div><div className="insight-item"><span className="insight-number">03</span><div><strong>ROI permanece estimado</strong><p>Sem histórico de retenção, produtividade e turnover, a recomendação deve permanecer indicativa.</p></div></div></div></div></section></>;
 }
 
-function SettingsView({ configuration, operations, savedScenarios, approvals, onResetConfiguration, onClearWorkspace, onRestoreWorkspace }) {
+function SettingsView({ configuration, operations, savedScenarios, approvals, onResetConfiguration, onClearWorkspace, onRestoreWorkspace, cloudSession, cloudWorkspace, onCloudAuth, onCloudLogout, onCloudSave, onCloudLoad }) {
   const [message, setMessage] = useState('');
+  const [cloudMessage, setCloudMessage] = useState('');
+  const [cloudEmail, setCloudEmail] = useState('');
+  const [cloudPassword, setCloudPassword] = useState('');
+  const [cloudName, setCloudName] = useState('Workspace T-Sim');
+  const [cloudMode, setCloudMode] = useState('login');
+  const [cloudBusy, setCloudBusy] = useState(false);
   const fileInputRef = useRef(null);
+
   function reset() { onResetConfiguration(); setMessage('Premissas de cargos restauradas.'); }
   function clear() { if (!window.confirm('Limpar toda a configuração local, cenários, aprovações e operações deste navegador?')) return; onClearWorkspace(); setMessage('Dados locais do ambiente restaurados para a referência inicial.'); }
   function exportWorkspace() { const payload = { produto: 'T-Sim', schemaVersion: 1, exportedAt: new Date().toISOString(), configuration, operations, savedScenarios, approvals }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'tsim-workspace-backup.json'; anchor.click(); URL.revokeObjectURL(url); setMessage('Backup local exportado.'); }
   async function importWorkspace(event) { const file = event.target.files?.[0]; if (!file) return; try { const payload = JSON.parse(await file.text()); if (payload?.produto !== 'T-Sim' || !payload.configuration?.cargos || !payload.operations) throw new Error('invalid'); onRestoreWorkspace(payload); setMessage('Backup restaurado neste navegador.'); } catch { setMessage('Arquivo inválido. Escolha um backup JSON exportado pelo T-Sim.'); } finally { event.target.value = ''; } }
-  return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> CONFIGURAÇÕES</div><h1>Controle as<br /><em>premissas locais.</em></h1><p>Gerencie as premissas locais do T-Sim e mantenha o trabalho disponível neste navegador.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Ambiente atual</div><strong>Local · navegador</strong><span>Dados disponíveis neste aparelho</span><button onClick={() => setMessage('O T-Sim está operando localmente neste navegador.')}>Ver status <ChevronRight size={14} /></button></div></section><section className="settings-grid"><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Fonte e governança</h2><p>Metadados do ambiente local</p></div></div></div><div className="settings-list"><div><span>Ambiente</span><strong>Base T-Sim · Bahia</strong></div><div><span>Responsável informado</span><strong>Tiago Santana</strong></div><div><span>Persistência</span><strong>localStorage · navegador atual</strong></div><div><span>Classificação dos resultados</span><strong>Informados, calculados e estimados</strong></div></div></div><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Ações do ambiente</h2><p>Recuperação segura do workspace local</p></div></div></div><div className="settings-actions"><button className="secondary-button" onClick={reset}>Restaurar cargos e encargos</button><button className="secondary-button" onClick={clear}>Limpar dados locais do workspace</button></div><div className="settings-backup"><input ref={fileInputRef} hidden type="file" accept="application/json,.json" onChange={importWorkspace} /><button className="secondary-button" onClick={exportWorkspace}>Exportar backup JSON</button><button className="secondary-button" onClick={() => fileInputRef.current?.click()}>Restaurar backup JSON</button></div>{message && <div className="settings-message"><Check size={15} />{message}</div>}<div className="panel-note"><ShieldCheck size={16} /><span>Os dados permanecem neste navegador. Use o backup JSON para transportar uma simulação manualmente.</span></div></div></section></>;
+  async function submitCloudAuth(event) { event.preventDefault(); setCloudBusy(true); setCloudMessage(''); try { await onCloudAuth({ email: cloudEmail, password: cloudPassword, signUp: cloudMode === 'signup' }); setCloudPassword(''); setCloudMessage(cloudMode === 'signup' ? 'Conta criada. Verifique o e-mail se a confirmação estiver ativa.' : 'Sessão iniciada.'); } catch (error) { setCloudMessage(error.message || 'Não foi possível acessar a conta.'); } finally { setCloudBusy(false); } }
+  async function saveCloud() { setCloudBusy(true); setCloudMessage(''); try { await onCloudSave(cloudName); setCloudMessage('Workspace salvo no banco compartilhado.'); } catch (error) { setCloudMessage(error.message || 'Não foi possível salvar no banco.'); } finally { setCloudBusy(false); } }
+  async function loadCloud() { setCloudBusy(true); setCloudMessage(''); try { const workspace = await onCloudLoad(); setCloudName(workspace.nome); setCloudMessage('Workspace restaurado do banco compartilhado.'); } catch (error) { setCloudMessage(error.message || 'Não foi possível carregar o workspace.'); } finally { setCloudBusy(false); } }
+  return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> CONFIGURAÇÕES</div><h1>Controle as<br /><em>premissas locais.</em></h1><p>Gerencie as premissas locais e, quando habilitado, o workspace compartilhado do T-Sim.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Ambiente atual</div><strong>{cloudSession ? 'Compartilhado + local' : 'Local · navegador'}</strong><span>{cloudSession ? cloudSession.user.email : 'Dados disponíveis neste aparelho'}</span><button onClick={() => setMessage(cloudSession ? 'Sessão compartilhada ativa.' : 'O T-Sim está operando localmente neste navegador.')}>Ver status <ChevronRight size={14} /></button></div></section><section className="settings-grid"><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Fonte e governança</h2><p>Metadados do ambiente local e compartilhado</p></div></div></div><div className="settings-list"><div><span>Ambiente</span><strong>Base T-Sim · Bahia</strong></div><div><span>Responsável informado</span><strong>Tiago Santana</strong></div><div><span>Persistência local</span><strong>localStorage · navegador atual</strong></div><div><span>Persistência compartilhada</span><strong>{cloudSession ? `Supabase · ${cloudWorkspace?.nome || 'nenhum workspace carregado'}` : 'Não conectada'}</strong></div><div><span>Classificação dos resultados</span><strong>Informados, calculados e estimados</strong></div></div></div><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Ações do ambiente</h2><p>Recuperação segura do workspace local</p></div></div></div><div className="settings-actions"><button className="secondary-button" onClick={reset}>Restaurar cargos e encargos</button><button className="secondary-button" onClick={clear}>Limpar dados locais do workspace</button></div><div className="settings-backup"><input ref={fileInputRef} hidden type="file" accept="application/json,.json" onChange={importWorkspace} /><button className="secondary-button" onClick={exportWorkspace}>Exportar backup JSON</button><button className="secondary-button" onClick={() => fileInputRef.current?.click()}>Restaurar backup JSON</button></div>{message && <div className="settings-message"><Check size={15} />{message}</div>}<div className="panel-note"><ShieldCheck size={16} /><span>O modo local continua disponível. O backup JSON transporta uma simulação manualmente.</span></div></div></section><section className="panel-surface cloud-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Workspace compartilhado</h2><p>Supabase Tconnect · permissões e auditoria persistente</p></div></div></div>{!cloudConfig.enabled ? <div className="panel-note"><Database size={16} /><span>Conexão ainda não configurada neste ambiente. O T-Sim segue local sem enviar dados.</span></div> : !cloudSession ? <form className="cloud-auth-form" onSubmit={submitCloudAuth}><div className="cloud-form-copy"><strong>{cloudMode === 'signup' ? 'Criar acesso compartilhado' : 'Entrar no workspace compartilhado'}</strong><span>A conta identifica o autor das alterações e aplica as permissões do banco.</span></div><label><span>E-mail</span><input type="email" required value={cloudEmail} onChange={(event) => setCloudEmail(event.target.value)} autoComplete="email" /></label><label><span>Senha</span><input type="password" required minLength="8" value={cloudPassword} onChange={(event) => setCloudPassword(event.target.value)} autoComplete={cloudMode === 'signup' ? 'new-password' : 'current-password'} /></label><div className="cloud-form-actions"><button className="primary-button" type="submit" disabled={cloudBusy}>{cloudBusy ? 'Aguarde…' : cloudMode === 'signup' ? 'Criar conta' : 'Entrar'}</button><button className="text-action" type="button" onClick={() => setCloudMode(cloudMode === 'signup' ? 'login' : 'signup')}>{cloudMode === 'signup' ? 'Já tenho conta' : 'Criar nova conta'}</button></div></form> : <div className="cloud-session"><div><strong>{cloudSession.user.email}</strong><span>{cloudWorkspace ? `Workspace ativo: ${cloudWorkspace.nome}` : 'Sessão ativa · nenhum workspace carregado'}</span></div><label><span>Nome do workspace</span><input value={cloudName} onChange={(event) => setCloudName(event.target.value)} /></label><div className="cloud-form-actions"><button className="primary-button" type="button" onClick={saveCloud} disabled={cloudBusy}>{cloudBusy ? 'Aguarde…' : cloudWorkspace ? 'Salvar alterações' : 'Criar workspace'}</button><button className="secondary-button" type="button" onClick={loadCloud} disabled={cloudBusy}>Carregar workspace</button><button className="text-action" type="button" onClick={onCloudLogout}>Sair</button></div></div>}{cloudMessage && <div className="settings-message"><Check size={15} />{cloudMessage}</div>}<div className="panel-note"><ShieldCheck size={16} /><span>O banco registra autor, horário, alteração e versão. O T-Sim não usa chave secreta no navegador.</span></div></section></>;
 }
 function AiView({ calc, operations }) {
   const coverage = calculateCoverage({ ...operations, quantity: 1 });
@@ -482,17 +493,32 @@ function App() {
   const [showAssumptions, setShowAssumptions] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [activeView, setActiveView] = useState('overview');
+  // O ambiente local abre direto no workspace. A autenticação fica disponível
+  // apenas nas Configurações quando o usuário optar pelo workspace compartilhado.
   const [entryStage, setEntryStage] = useState('workspace');
   const [savedScenarios, setSavedScenarios] = useState(() => loadSavedScenarios());
   const [operations, setOperations] = useState(() => loadOperations(operationsDefaults));
   const [approvals, setApprovals] = useState(() => loadApprovals());
   const [saveMessage, setSaveMessage] = useState('');
   const [theme, setTheme] = useState(() => window.localStorage.getItem('tsim.theme.v1') || 'light');
+  const [cloudSession, setCloudSession] = useState(null);
+  const [cloudWorkspace, setCloudWorkspace] = useState(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem('tsim.theme.v1', theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!supabase) return undefined;
+    let active = true;
+    getCloudSession().then((session) => { if (active) setCloudSession(session); }).catch(() => {});
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCloudSession(session);
+      if (!session) setCloudWorkspace(null);
+    });
+    return () => { active = false; subscription.unsubscribe(); };
+  }, []);
 
   const enterWorkspace = () => {
     window.localStorage.setItem('tsim.onboarding.v1', 'completed');
@@ -552,6 +578,36 @@ function App() {
     setOperations(nextOperations);
     setSavedScenarios(payload.savedScenarios ?? []);
     setApprovals(payload.approvals ?? {});
+  }
+
+  async function handleCloudAuth({ email, password, signUp }) {
+    const session = signUp ? await signUpCloud(email, password) : await signInCloud(email, password);
+    setCloudSession(session);
+    return session;
+  }
+
+  async function handleCloudSave(name) {
+    const payload = { produto: 'T-Sim', schemaVersion: 1, exportedAt: new Date().toISOString(), configuration, operations, savedScenarios, approvals };
+    const workspace = cloudWorkspace
+      ? await updateCloudWorkspace(cloudWorkspace.id, payload)
+      : await createCloudWorkspace({ name, payload });
+    setCloudWorkspace(workspace);
+    return workspace;
+  }
+
+  async function handleCloudLoad() {
+    const workspaces = await listCloudWorkspaces();
+    if (!workspaces.length) throw new Error('Nenhum workspace compartilhado foi encontrado para esta conta.');
+    const workspace = workspaces[0];
+    if (workspace.payload?.configuration && workspace.payload?.operations) handleRestoreWorkspace(workspace.payload);
+    setCloudWorkspace(workspace);
+    return workspace;
+  }
+
+  async function handleCloudLogout() {
+    await signOutCloud();
+    setCloudSession(null);
+    setCloudWorkspace(null);
   }
 
   function snapshotScenario() {
@@ -646,7 +702,7 @@ function App() {
           <button className="mobile-close" onClick={() => setMobileNav(false)} aria-label="Fechar navegação"><X size={18} /></button>
         </div>
 
-        <button className="workspace-select" type="button" aria-label="Abrir acesso e onboarding do ambiente local" onClick={() => setEntryStage('login')}>
+        <button className="workspace-select" type="button" aria-label="Abrir configurações do ambiente" onClick={() => setActiveView('settings')}>
           <div className="workspace-orb">TS</div>
           <div className="workspace-copy"><span>Ambiente local</span><strong>Base T-Sim · Bahia</strong></div>
           <ChevronRight size={15} aria-hidden="true" />
@@ -679,7 +735,7 @@ function App() {
         </header>
 
         <div className="content-wrap" id="workspace-content" tabIndex="-1">
-          {activeView === 'people' ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} onSaveConfiguration={handleSaveConfiguration} onResetConfiguration={handleResetConfiguration} saved={Boolean(window.localStorage.getItem('tsim.configuration.v1'))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} /> : activeView === 'presentation' ? <InstitutionalView onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'ops' ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' ? <AnalyticsView savedScenarios={savedScenarios} /> : activeView === 'ai' ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' ? <SettingsView configuration={configuration} operations={operations} savedScenarios={savedScenarios} approvals={approvals} onResetConfiguration={handleResetConfiguration} onClearWorkspace={handleClearWorkspace} onRestoreWorkspace={handleRestoreWorkspace} /> : <>
+          {activeView === 'people' ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} onSaveConfiguration={handleSaveConfiguration} onResetConfiguration={handleResetConfiguration} saved={Boolean(window.localStorage.getItem('tsim.configuration.v1'))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} /> : activeView === 'presentation' ? <InstitutionalView onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'ops' ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' ? <AnalyticsView savedScenarios={savedScenarios} /> : activeView === 'ai' ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' ? <SettingsView configuration={configuration} operations={operations} savedScenarios={savedScenarios} approvals={approvals} onResetConfiguration={handleResetConfiguration} onClearWorkspace={handleClearWorkspace} onRestoreWorkspace={handleRestoreWorkspace} cloudSession={cloudSession} cloudWorkspace={cloudWorkspace} onCloudAuth={handleCloudAuth} onCloudLogout={handleCloudLogout} onCloudSave={handleCloudSave} onCloudLoad={handleCloudLoad} /> : <>
           <section className="hero-intro">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> SIMULADOR DE DECISÃO</div>

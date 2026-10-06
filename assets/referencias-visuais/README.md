@@ -43,6 +43,6 @@ Exemplo: `logo-principal_tsim_interno_v01.svg`
 - O símbolo quadrado está em `04-icones-favicon/t-sim-mark-v01.png`.
 - O mockup do app está em `07-mockups/t-sim-app-mockup-v01.png`.
 - As versões SVG escaláveis para fundos claro/escuro, assinatura vertical e favicon ficam em `public/brand/` e são listadas em `docs/brand-guidelines.md`.
-- As cópias versionadas para aprovação ficam em `01-logo-marca/` e `04-icones-favicon/`.
+- As cópias versionadas aprovadas ficam em `01-logo-marca/` e `04-icones-favicon/`; os ativos canônicos usados pelo frontend ficam em `public/brand/`.
 
 Os ativos gerados são referências de direção visual. Textos, dados, unidades e controles do produto devem continuar em HTML/CSS/SVG editável no frontend.
