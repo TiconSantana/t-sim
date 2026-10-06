@@ -17,11 +17,14 @@ export function calculateSimulation({
   const dismissedCost = custo(dismissed, encargos);
   const originCost = custo(origin, encargos);
   const destinationCost = custo(destination, encargos);
+  const originIndex = cargoList.findIndex((cargo) => cargo.id === originRole);
+  const destinationIndex = cargoList.findIndex((cargo) => cargo.id === destinationRole);
+  const promotionEligible = originIndex >= 0 && destinationIndex > originIndex;
   const economy = dismissedCost * Math.max(1, quantity);
   const delta = destinationCost - originCost;
-  const promotions = delta > 0 ? Math.floor(economy / delta) : 0;
-  const selectedManualPromotions = Math.max(0, manualPromotions ?? promotions);
-  const manualPromotionCost = Math.max(delta, 0) * selectedManualPromotions;
+  const promotions = promotionEligible && delta > 0 ? Math.floor(economy / delta) : 0;
+  const selectedManualPromotions = promotionEligible ? Math.max(0, manualPromotions ?? promotions) : 0;
+  const manualPromotionCost = promotionEligible ? Math.max(delta, 0) * selectedManualPromotions : 0;
   const manualBalance = economy - manualPromotionCost;
   const conservativePromotions = 0;
   const balancedPromotions = Math.min(promotions, 4);
@@ -40,6 +43,10 @@ export function calculateSimulation({
     dismissedCost,
     originCost,
     destinationCost,
+    originIndex,
+    destinationIndex,
+    promotionEligible,
+    promotionBlockReason: promotionEligible ? '' : 'Escolha um cargo de destino acima do nível de origem.',
     economy,
     delta,
     promotions,
