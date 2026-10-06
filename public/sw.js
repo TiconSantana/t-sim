@@ -1,5 +1,15 @@
 const CACHE_NAME = 't-sim-shell-v1';
-const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/brand/t-sim-favicon.svg', '/brand/t-sim-logo-header.png'];
+const APP_SHELL = [
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/icon.svg',
+  '/brand/t-sim-favicon.svg',
+  '/brand/t-sim-mark.png',
+  '/brand/t-sim-logo-header.png',
+  '/brand/t-sim-hero-background.png',
+  '/brand/t-sim-app-mockup.png',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));

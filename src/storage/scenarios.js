@@ -72,9 +72,10 @@ export function normalizeOperations(value, defaults) {
       basisId: defaults.basisId,
       basisVersion: defaults.basisVersion,
       basisSource: defaults.basisSource,
+      dimensions: defaults.dimensions,
     };
   }
-  return merged;
+  return { ...merged, dimensions: Array.isArray(merged.dimensions) ? merged.dimensions : defaults.dimensions };
 }
 
 export function saveOperations(operations) {

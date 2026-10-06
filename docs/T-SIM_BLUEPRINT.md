@@ -317,6 +317,7 @@ Ops e Pareceres:
 - Budget apresenta waterfall da folha e separa as premissas de encargos, ADM, BDI e margem.
 - Analytics apresenta os custos de Campo, Sala Técnica e classes de equipe extraídos da fonte operacional.
 - Analytics e Ops usam 672 HC da aba Custos Equipes como base operacional oficial. Os 609 HC do Controle Local permanecem visíveis apenas como referência comparativa, sem soma automática.
+- Ops permite dimensionar linhas por região, turno e atividade, com capacidade por HC, cobertura projetada, fonte, vigência e bloqueio explícito quando o rateio necessário não foi informado.
 - T-Sim AI apresenta um parecer local baseado em regras, perguntas de validação e classificação explícita como estimativa.
 - Pareceres oferece impressão/PDF pelo navegador, além de JSON e Excel; Configurações oferece backup e restauração do workspace em JSON.
 - Configurações permite recuperar a grade e limpar os dados locais do ambiente demonstrativo.
@@ -324,4 +325,4 @@ Ops e Pareceres:
 - O deploy público está conectado ao GitHub `TiconSantana/t-sim` e à Vercel `t-sim`.
 - O MVP permanece local: o navegador guarda o workspace em `localStorage` e a tela Configurações permite exportar ou restaurar um backup JSON.
 
-O deploy público serve a mesma aplicação local em `https://t-sim.vercel.app`. Contas e sincronização entre aparelhos ficam fora do escopo desta fase e poderão ser avaliadas depois da validação do simulador.
+O deploy público serve a mesma aplicação local em `https://t-sim.vercel.app`. Contas e sincronização entre aparelhos não fazem parte desta pauta; o workspace permanece local por navegador.

@@ -76,6 +76,29 @@ export const operationalSource = {
   note: 'Valores de custo operacional permanecem separados da simulação simplificada de cargos.',
 };
 
+// A fonte informa Bahia e a atividade de operador, mas não apresenta rateio
+// confiável por turno e atividade. A linha inicial preserva essa lacuna para
+// edição/importação sem fabricar uma distribuição operacional.
+export const operationalDimensions = [
+  {
+    id: 'bahia-campo-operador',
+    region: 'Bahia',
+    shift: 'Não informado',
+    activity: 'Operador multifunções',
+    teamClass: 'Campo FTTH',
+    currentHeadcount: 672,
+    requiredHeadcount: 672,
+    capacityPerPerson: 1,
+    slaTarget: 95,
+    safetyBuffer: 10,
+    source: 'Custos Equipes + Controle Local',
+    validity: 'Abr/2025',
+    classification: 'Informada',
+    capacityClassification: 'Estimada',
+    allocationStatus: 'Pendente de rateio por turno e atividade',
+  },
+];
+
 export const operationsDefaults = {
   teamHeadcount: 672,
   requiredHeadcount: 672,
@@ -84,4 +107,5 @@ export const operationsDefaults = {
   basisId: 'custos-equipes-672',
   basisVersion: 'Abr/2025',
   basisSource: 'Cópia de Custos e Preço V3 · Custos Equipes',
+  dimensions: operationalDimensions,
 };

@@ -21,6 +21,7 @@ import {
   Layers3,
   Menu,
   Moon,
+  Plus,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -33,7 +34,7 @@ import {
 import { cargos, custo, MESES } from './data/cargos';
 import { costAssumptions, operationalCosts, operationalSource, operationsDefaults, teamClasses } from './data/operacao';
 import { calculateSimulation } from './domain/simulation';
-import { calculateCoverage, validateScenarioForApproval } from './domain/operations';
+import { calculateCoverage, calculateDimensionCoverage, validateScenarioForApproval } from './domain/operations';
 import { loadApprovals, loadConfiguration, loadOperations, loadSavedScenarios, normalizeOperations, saveApproval, saveConfiguration, saveOperations, saveScenario } from './storage/scenarios';
 import * as XLSX from 'xlsx';
 import './styles.css';
@@ -196,18 +197,76 @@ function OverviewView({ cargoList, encargos, savedScenarios, onGoSimulator, onGo
 }
 
 function OperationsView({ operations, onSave, calc, quantity }) {
-  const [draft, setDraft] = useState(operations);
+  const [draft, setDraft] = useState(() => ({ ...operations, dimensions: operations.dimensions ?? [] }));
   const [message, setMessage] = useState('');
+  const dimensionResult = calculateDimensionCoverage(draft.dimensions, quantity);
   const coverageResult = calculateCoverage({ ...draft, quantity });
   const { current: coverage, afterMovement: projectedCoverage, risk, safetyTarget } = coverageResult;
-  function update(field, value) { setDraft((current) => ({ ...current, [field]: Math.max(0, Number(value) || 0) })); }
-  function save() { onSave(draft); setMessage('Premissas operacionais salvas'); }
-  return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> OPERAÇÃO</div><h1>Proteja a<br /><em>cobertura.</em></h1><p>Uma economia só é sustentável quando a equipe continua capaz de cumprir o volume e o SLA da operação.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Modelo operacional</div><strong>Campo · FTTH</strong><span>Premissas locais editáveis</span><button onClick={save}>Salvar premissas <ChevronRight size={14} /></button></div></section><section className="metric-grid"><Metric label="Headcount atual" value={draft.teamHeadcount} detail="equipe operacional informada" tone="blue" icon={UsersRound} /><Metric label="Headcount requerido" value={draft.requiredHeadcount} detail="cobertura mínima planejada" tone="violet" icon={Activity} /><Metric label="Cobertura atual" value={`${coverage.toFixed(1)}%`} detail={`SLA + faixa de atenção ${safetyTarget.toFixed(1)}%`} tone={coverage >= safetyTarget ? 'green' : 'orange'} icon={Gauge} /><Metric label="Cobertura após movimento" value={`${projectedCoverage.toFixed(1)}%`} detail={`risco projetado: ${risk}`} tone={risk === 'Baixo' ? 'green' : 'orange'} icon={ShieldCheck} /></section><section className="ops-grid"><div className="panel-surface ops-editor"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Premissas de cobertura</h2><p>Valores de referência do dimensionamento operacional.</p></div></div></div><div className="ops-fields"><label><span>Headcount atual</span><input type="number" min="0" value={draft.teamHeadcount} onChange={(event) => update('teamHeadcount', event.target.value)} /></label><label><span>Headcount requerido</span><input type="number" min="0" value={draft.requiredHeadcount} onChange={(event) => update('requiredHeadcount', event.target.value)} /></label><label><span>SLA alvo (%)</span><input type="number" min="0" max="100" value={draft.slaTarget} onChange={(event) => update('slaTarget', event.target.value)} /></label><label><span>Margem de segurança (%)</span><input type="number" min="0" max="100" value={draft.safetyBuffer} onChange={(event) => update('safetyBuffer', event.target.value)} /></label></div><div className="editor-actions"><div><strong>{message || 'A configuração controla o alerta de cobertura.'}</strong><span>Persistência local · módulo Ops</span></div><button className="primary-button editor-save" onClick={save}>Salvar operação</button></div><div className="panel-note"><ShieldCheck size={16} /><span>O cálculo é um proxy de capacidade: reduz posições do headcount informado e usa a margem como faixa de atenção. Valide região, turno e equipe antes da aprovação.</span></div></div><aside className="panel-surface ops-impact"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Impacto do cenário atual</h2><p>Movimento selecionado no simulador</p></div></div></div><div className="ops-impact-readout"><div><span>Economia mensal</span><strong>{money(calc.economy)}</strong></div><div><span>Promoções aplicadas</span><strong>{calc.appliedPromotions}</strong></div><div><span>Headcount após desligamentos</span><strong>{Math.max(0, draft.teamHeadcount - quantity)}</strong></div></div><div className={`ops-risk-box risk-box-${risk.toLowerCase()}`}><ShieldCheck size={17} /><div><strong>Risco operacional: {risk}</strong><span>SLA alvo + faixa: {safetyTarget.toFixed(1)}%. Valide cobertura por região antes de aprovar.</span></div></div></aside></section></>;
+
+  function update(field, value) {
+    setDraft((current) => ({ ...current, [field]: Math.max(0, Number(value) || 0) }));
+  }
+
+  function updateDimension(index, field, value) {
+    setDraft((current) => ({
+      ...current,
+      dimensions: current.dimensions.map((row, rowIndex) => rowIndex === index
+        ? { ...row, [field]: ['currentHeadcount', 'requiredHeadcount', 'capacityPerPerson', 'slaTarget', 'safetyBuffer'].includes(field) ? Math.max(0, Number(value) || 0) : value }
+        : row),
+    }));
+  }
+
+  function addDimension() {
+    setDraft((current) => ({
+      ...current,
+      dimensions: [...current.dimensions, {
+        id: `dimension-${Date.now()}`,
+        region: '',
+        shift: '',
+        activity: '',
+        teamClass: 'Campo FTTH',
+        currentHeadcount: 0,
+        requiredHeadcount: 0,
+        capacityPerPerson: 1,
+        slaTarget: current.slaTarget,
+        safetyBuffer: current.safetyBuffer,
+        source: 'A informar',
+        validity: 'A informar',
+        classification: 'Informada',
+        capacityClassification: 'Estimada',
+        allocationStatus: 'Nova linha aguardando fonte',
+      }],
+    }));
+  }
+
+  function removeDimension(index) {
+    setDraft((current) => ({ ...current, dimensions: current.dimensions.filter((_, rowIndex) => rowIndex !== index) }));
+  }
+
+  function save() {
+    onSave({ ...draft, teamHeadcount: dimensionResult.totalCurrent || draft.teamHeadcount, requiredHeadcount: dimensionResult.totalRequired || draft.requiredHeadcount });
+    setMessage('Premissas e dimensões operacionais salvas');
+  }
+
+  return <>
+    <section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> OPERAÇÃO</div><h1>Proteja a<br /><em>cobertura.</em></h1><p>Uma economia só é sustentável quando a equipe continua capaz de cumprir o volume e o SLA da operação.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Modelo operacional</div><strong>Campo · FTTH</strong><span>Região, turno e atividade</span><button onClick={save}>Salvar premissas <ChevronRight size={14} /></button></div></section>
+    <section className="metric-grid"><Metric label="Headcount atual" value={dimensionResult.totalCurrent || draft.teamHeadcount} detail="soma das dimensões" tone="blue" icon={UsersRound} /><Metric label="Headcount requerido" value={dimensionResult.totalRequired || draft.requiredHeadcount} detail="soma das dimensões" tone="violet" icon={Activity} /><Metric label="Cobertura atual" value={`${dimensionResult.current.toFixed(1)}%`} detail="capacidade por dimensão" tone={dimensionResult.current >= safetyTarget ? 'green' : 'orange'} icon={Gauge} /><Metric label="Cobertura após movimento" value={`${dimensionResult.afterMovement.toFixed(1)}%`} detail={`risco global: ${risk}`} tone={dimensionResult.approvalBlocked ? 'orange' : 'green'} icon={ShieldCheck} /></section>
+    <section className="ops-grid"><div className="panel-surface ops-editor"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Premissas globais</h2><p>Referência legada mantida para comparação com as dimensões.</p></div></div></div><div className="ops-fields"><label><span>Headcount atual</span><input type="number" min="0" value={draft.teamHeadcount} onChange={(event) => update('teamHeadcount', event.target.value)} /></label><label><span>Headcount requerido</span><input type="number" min="0" value={draft.requiredHeadcount} onChange={(event) => update('requiredHeadcount', event.target.value)} /></label><label><span>SLA alvo (%)</span><input type="number" min="0" max="100" value={draft.slaTarget} onChange={(event) => update('slaTarget', event.target.value)} /></label><label><span>Margem de segurança (%)</span><input type="number" min="0" max="100" value={draft.safetyBuffer} onChange={(event) => update('safetyBuffer', event.target.value)} /></label></div><div className="editor-actions"><div><strong>{message || 'A configuração controla o alerta de cobertura.'}</strong><span>Persistência local · módulo Ops</span></div><button className="primary-button editor-save" onClick={save}>Salvar operação</button></div></div><aside className="panel-surface ops-impact"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Impacto do cenário atual</h2><p>Movimento selecionado no simulador</p></div></div></div><div className="ops-impact-readout"><div><span>Economia mensal</span><strong>{money(calc.economy)}</strong></div><div><span>Promoções aplicadas</span><strong>{calc.appliedPromotions}</strong></div><div><span>Headcount após desligamentos</span><strong>{Math.max(0, dimensionResult.totalCurrent - quantity)}</strong></div></div><div className={`ops-risk-box risk-box-${risk.toLowerCase()}`}><ShieldCheck size={17} /><div><strong>Risco operacional: {risk}</strong><span>O cenário é distribuído proporcionalmente entre as dimensões.</span></div></div></aside></section>
+    <section className="panel-surface ops-dimensions-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Dimensionamento por contexto</h2><p>Região, turno, atividade, capacidade e cobertura</p></div></div><button className="text-action" onClick={addDimension}><Plus size={14} /> Adicionar dimensão</button></div><div className="dimension-table-wrap"><table className="dimension-table"><caption className="sr-only">Dimensões operacionais editáveis</caption><thead><tr><th>Região</th><th>Turno</th><th>Atividade</th><th>HC atual</th><th>HC requerido</th><th>Cap./HC</th><th>Cobertura</th><th /></tr></thead><tbody>{draft.dimensions.map((row, index) => { const result = dimensionResult.rows[index]; return <tr key={row.id}><td><input aria-label={`Região ${index + 1}`} value={row.region} onChange={(event) => updateDimension(index, 'region', event.target.value)} placeholder="Ex.: Bahia" /></td><td><input aria-label={`Turno ${index + 1}`} value={row.shift} onChange={(event) => updateDimension(index, 'shift', event.target.value)} placeholder="Ex.: Diurno" /></td><td><input aria-label={`Atividade ${index + 1}`} value={row.activity} onChange={(event) => updateDimension(index, 'activity', event.target.value)} placeholder="Ex.: Instalação" /></td><td><input aria-label={`HC atual ${index + 1}`} type="number" min="0" value={row.currentHeadcount} onChange={(event) => updateDimension(index, 'currentHeadcount', event.target.value)} /></td><td><input aria-label={`HC requerido ${index + 1}`} type="number" min="0" value={row.requiredHeadcount} onChange={(event) => updateDimension(index, 'requiredHeadcount', event.target.value)} /></td><td><input aria-label={`Capacidade por HC ${index + 1}`} type="number" min="0" step="0.1" value={row.capacityPerPerson} onChange={(event) => updateDimension(index, 'capacityPerPerson', event.target.value)} /></td><td><strong>{result?.afterMovement.toFixed(1) ?? '0.0'}%</strong><small>{result?.risk ?? 'Sem dados'}{result?.missingAllocation ? ' · rateio pendente' : ''}</small></td><td><button className="icon-button" aria-label={`Remover dimensão ${index + 1}`} onClick={() => removeDimension(index)}><X size={14} /></button></td></tr>; })}</tbody></table></div><div className="panel-note"><Database size={16} /><span>{dimensionResult.missingAllocation.length ? `${dimensionResult.missingAllocation.length} dimensão(ões) ainda sem região, turno ou atividade completos. A cobertura fica visível, mas a aprovação permanece bloqueada até o rateio ser informado.` : 'Todas as dimensões possuem região, turno e atividade. Revise a fonte e a vigência antes de aprovar.'}</span></div></section>
+    <section className="panel-surface ops-source-panel"><div className="panel-heading compact"><div><span className="section-index">04</span><div><h2>Rastreabilidade da base</h2><p>Fonte e classificação preservadas por linha</p></div></div></div><div className="dimension-source-list">{draft.dimensions.map((row) => <div key={`${row.id}-source`}><strong>{row.region || 'Região pendente'} · {row.activity || 'Atividade pendente'}</strong><span>{row.source || 'Fonte pendente'} · {row.validity || 'Vigência pendente'} · capacidade {row.capacityClassification || 'não classificada'}</span></div>)}</div></section>
+  </>;
 }
 
 function ReportsView({ savedScenarios, approvals, onApproval, onGoScenarios, currentSnapshot }) {
   function downloadReport(scenario) {
-    const report = { produto: 'T-Sim', geradoEm: new Date().toISOString(), scenario, approval: approvals[scenario.id] || { status: 'Rascunho' } };
+    const report = {
+      produto: 'T-Sim',
+      assinatura: 'Simular antes. Decidir melhor.',
+      geradoEm: new Date().toISOString(),
+      identificacao: { produto: 'T-Sim', versao: '0.1 · MVP local', ambiente: 'Base T-Sim · Bahia' },
+      scenario,
+      approval: approvals[scenario.id] || { status: 'Rascunho' },
+    };
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `tsim-parecer-${scenario.id}.json`; anchor.click(); URL.revokeObjectURL(url);
   }
@@ -228,7 +287,20 @@ function ReportsView({ savedScenarios, approvals, onApproval, onGoScenarios, cur
       Status: approvals[scenario.id]?.status || 'Rascunho',
     }];
     const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const worksheet = XLSX.utils.json_to_sheet(rows, { skipHeader: false });
+    worksheet['!cols'] = [
+      { wch: 16 }, { wch: 26 }, { wch: 12 }, { wch: 22 }, { wch: 21 }, { wch: 17 },
+      { wch: 16 }, { wch: 20 }, { wch: 27 }, { wch: 16 }, { wch: 14 }, { wch: 34 }, { wch: 16 },
+    ];
+    const metadata = XLSX.utils.aoa_to_sheet([
+      ['T-SIM · PARECER DE CENÁRIO'],
+      ['Simular antes. Decidir melhor.'],
+      ['Ambiente', 'Base T-Sim · Bahia'],
+      ['Gerado em', new Date().toLocaleString('pt-BR')],
+      ['Uso', 'Documento de trabalho · validar premissas antes da aprovação'],
+    ]);
+    metadata['!cols'] = [{ wch: 18 }, { wch: 72 }];
+    XLSX.utils.book_append_sheet(workbook, metadata, 'Identidade');
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Parecer');
     XLSX.writeFile(workbook, `tsim-parecer-${scenario.id}.xlsx`);
   }
@@ -236,7 +308,7 @@ function ReportsView({ savedScenarios, approvals, onApproval, onGoScenarios, cur
     window.print();
   }
   const list = savedScenarios.length ? savedScenarios : currentSnapshot ? [currentSnapshot] : [];
-  return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> PARECERES E APROVAÇÃO</div><h1>Da simulação à<br /><em>decisão.</em></h1><p>Registre a recomendação, mantenha as premissas visíveis e entregue um resumo que a Diretoria consiga revisar.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Trilha de decisão</div><strong>{Object.values(approvals).filter((item) => item.status === 'Aprovado').length} aprovado(s)</strong><span>Decisões locais registradas</span><button onClick={printReport}><FileText size={13} /> Imprimir / PDF</button></div></section><section className="metric-grid"><Metric label="Prontos para revisão" value={list.length} detail="cenários com resumo" tone="blue" icon={FileText} /><Metric label="Em aprovação" value={list.filter((scenario) => approvals[scenario.id]?.status === 'Enviado').length} detail="aguardando decisão" tone="orange" icon={ClipboardCheck} /><Metric label="Aprovados" value={list.filter((scenario) => approvals[scenario.id]?.status === 'Aprovado').length} detail="trilha registrada" tone="green" icon={Check} /><Metric label="Formato de saída" value="JSON + Excel" detail="relatório local exportável" tone="violet" icon={FileSpreadsheet} /></section><section className="panel-surface reports-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Fila de decisão</h2><p>Envie, aprove ou exporte cada cenário.</p></div></div></div>{list.length === 0 ? <div className="empty-state"><FileText size={25} /><strong>Nenhum cenário pronto</strong><p>Salve uma simulação para gerar um parecer.</p><button className="primary-button compact-button" onClick={onGoScenarios}>Abrir cenários</button></div> : <div className="report-list">{list.map((scenario) => { const status = approvals[scenario.id]?.status || 'Rascunho'; const validation = validateScenarioForApproval({ scenario }); const blocked = !validation.valid; return <article className="report-item" key={scenario.id}><div className="report-main"><div className="report-icon"><FileText size={16} /></div><div><strong>{scenario.name}</strong><span>{scenario.quantity} posição{scenario.quantity === 1 ? '' : 'ões'} · {scenario.appliedPromotions} promoções · saldo {money(scenario.appliedBalance)}</span>{blocked && <small className="report-warning">Bloqueado: {validation.message}</small>}</div></div><span className={`approval-status status-${status.toLowerCase()}`}>{status}</span><div className="report-actions"><button disabled={blocked && status !== 'Aprovado'} title={blocked ? validation.message : undefined} onClick={() => onApproval(scenario.id, status === 'Aprovado' ? 'Rascunho' : status === 'Enviado' ? 'Aprovado' : 'Enviado')}>{status === 'Rascunho' ? 'Enviar' : status === 'Enviado' ? 'Aprovar' : 'Reabrir'}</button><button onClick={() => downloadReport(scenario)}><Download size={12} /> JSON</button><button onClick={() => downloadSpreadsheet(scenario)}><FileSpreadsheet size={12} /> Excel</button></div></article>; })}</div>}</section></>;
+  return <><div className="print-brand"><img src="/brand/t-sim-mark-on-light.svg" alt="" /><div><strong>T-SIM</strong><span>Simular antes. Decidir melhor.</span></div><small>Base T-Sim · Bahia</small></div><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> PARECERES E APROVAÇÃO</div><h1>Da simulação à<br /><em>decisão.</em></h1><p>Registre a recomendação, mantenha as premissas visíveis e entregue um resumo que a Diretoria consiga revisar.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Trilha de decisão</div><strong>{Object.values(approvals).filter((item) => item.status === 'Aprovado').length} aprovado(s)</strong><span>Decisões locais registradas</span><button onClick={printReport}><FileText size={13} /> Imprimir / PDF</button></div></section><section className="metric-grid"><Metric label="Prontos para revisão" value={list.length} detail="cenários com resumo" tone="blue" icon={FileText} /><Metric label="Em aprovação" value={list.filter((scenario) => approvals[scenario.id]?.status === 'Enviado').length} detail="aguardando decisão" tone="orange" icon={ClipboardCheck} /><Metric label="Aprovados" value={list.filter((scenario) => approvals[scenario.id]?.status === 'Aprovado').length} detail="trilha registrada" tone="green" icon={Check} /><Metric label="Formato de saída" value="JSON + Excel" detail="relatório local exportável" tone="violet" icon={FileSpreadsheet} /></section><section className="panel-surface reports-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Fila de decisão</h2><p>Envie, aprove ou exporte cada cenário.</p></div></div></div>{list.length === 0 ? <div className="empty-state"><FileText size={25} /><strong>Nenhum cenário pronto</strong><p>Salve uma simulação para gerar um parecer.</p><button className="primary-button compact-button" onClick={onGoScenarios}>Abrir cenários</button></div> : <div className="report-list">{list.map((scenario) => { const status = approvals[scenario.id]?.status || 'Rascunho'; const validation = validateScenarioForApproval({ scenario }); const blocked = !validation.valid; return <article className="report-item" key={scenario.id}><div className="report-main"><div className="report-icon"><FileText size={16} /></div><div><strong>{scenario.name}</strong><span>{scenario.quantity} posição{scenario.quantity === 1 ? '' : 'ões'} · {scenario.appliedPromotions} promoções · saldo {money(scenario.appliedBalance)}</span>{blocked && <small className="report-warning">Bloqueado: {validation.message}</small>}</div></div><span className={`approval-status status-${status.toLowerCase()}`}>{status}</span><div className="report-actions"><button disabled={blocked && status !== 'Aprovado'} title={blocked ? validation.message : undefined} onClick={() => onApproval(scenario.id, status === 'Aprovado' ? 'Rascunho' : status === 'Enviado' ? 'Aprovado' : 'Enviado')}>{status === 'Rascunho' ? 'Enviar' : status === 'Enviado' ? 'Aprovar' : 'Reabrir'}</button><button onClick={() => downloadReport(scenario)}><Download size={12} /> JSON</button><button onClick={() => downloadSpreadsheet(scenario)}><FileSpreadsheet size={12} /> Excel</button></div></article>; })}</div>}</section></>;
 }
 
 function BudgetView({ calc, cargoList, encargos }) {
