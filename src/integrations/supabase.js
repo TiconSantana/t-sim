@@ -97,3 +97,47 @@ export async function updateCloudWorkspace(workspaceId, payload) {
   if (error) throw error;
   return data;
 }
+
+export async function listCloudMembers(workspaceId) {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('tsim_workspace_member')
+    .select('workspace_id, colaborador_id, papel, criado_em, revogado_em, colaborador:colaborador_id(id, nome, nome_exibicao, email, status_cadastro)')
+    .eq('workspace_id', workspaceId)
+    .order('criado_em', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function addCloudMember({ workspaceId, email, role }) {
+  if (!supabase) throw new Error('Supabase não configurado neste ambiente.');
+  const normalizedEmail = email.trim().toLowerCase();
+  const { data: collaborator, error: collaboratorError } = await supabase
+    .from('colaborador')
+    .select('id, nome, nome_exibicao, email, status_cadastro')
+    .eq('email', normalizedEmail)
+    .eq('status_cadastro', 'ATIVO')
+    .single();
+  if (collaboratorError || !collaborator) throw new Error('Não encontrei um colaborador ativo com esse e-mail na empresa.');
+  const { data, error } = await supabase
+    .from('tsim_workspace_member')
+    .upsert({ workspace_id: workspaceId, colaborador_id: collaborator.id, papel: role, revogado_em: null }, { onConflict: 'workspace_id,colaborador_id' })
+    .select('workspace_id, colaborador_id, papel, criado_em, revogado_em, colaborador:colaborador_id(id, nome, nome_exibicao, email, status_cadastro)')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function revokeCloudMember({ workspaceId, collaboratorId }) {
+  if (!supabase) throw new Error('Supabase não configurado neste ambiente.');
+  const { data, error } = await supabase
+    .from('tsim_workspace_member')
+    .update({ revogado_em: new Date().toISOString() })
+    .eq('workspace_id', workspaceId)
+    .eq('colaborador_id', collaboratorId)
+    .neq('papel', 'owner')
+    .select('workspace_id, colaborador_id, papel, criado_em, revogado_em, colaborador:colaborador_id(id, nome, nome_exibicao, email, status_cadastro)')
+    .single();
+  if (error) throw error;
+  return data;
+}

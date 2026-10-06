@@ -506,6 +506,16 @@ html[data-theme="dark"] .dimension-table td input { background: #08131f; color: 
 .cloud-auth-form input, .cloud-session input { width: 100%; min-height: 42px; border: 1px solid var(--ink-200); border-radius: 9px; padding: 10px 12px; background: var(--surface); color: var(--ink-950); font: inherit; font-size: 13px; letter-spacing: normal; text-transform: none; }
 .cloud-auth-form input:focus, .cloud-session input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px var(--focus-ring); outline: none; }
 .cloud-form-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cloud-members { display: grid; gap: 14px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--ink-100); }
+.member-form { display: grid; grid-template-columns: minmax(220px, 1fr) 180px auto; align-items: end; gap: 12px; }
+.member-form label { display: grid; gap: 6px; color: var(--ink-700); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.member-form input, .member-form select { width: 100%; min-height: 42px; border: 1px solid var(--ink-200); border-radius: 9px; padding: 10px 12px; background: var(--surface); color: var(--ink-950); font: inherit; font-size: 13px; letter-spacing: normal; text-transform: none; }
+.member-list { display: grid; gap: 8px; }
+.member-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 11px 12px; border: 1px solid var(--ink-100); border-radius: 10px; }
+.member-row > div { display: grid; gap: 3px; min-width: 0; }
+.member-row strong { color: var(--ink-900); font-size: 12px; }
+.member-row span, .cloud-empty { color: var(--ink-500); font-size: 11px; }
+@media (max-width: 780px) { .member-form { grid-template-columns: 1fr; } }
 
 /* OLED theme: same information architecture, different working light. */
 html[data-theme="dark"] {
