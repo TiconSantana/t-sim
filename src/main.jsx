@@ -35,7 +35,8 @@ import { cargos, custo, MESES } from './data/cargos';
 import { costAssumptions, operationalCosts, operationalSource, operationsDefaults, teamClasses } from './data/operacao';
 import { calculateSimulation } from './domain/simulation';
 import { calculateCoverage, calculateDimensionCoverage, validateScenarioForApproval } from './domain/operations';
-import { loadApprovals, loadConfiguration, loadOperations, loadSavedScenarios, normalizeOperations, saveApproval, saveConfiguration, saveOperations, saveScenario } from './storage/scenarios';
+import { createLocalProfile, getActiveProfileId, loadApprovals, loadConfiguration, loadImportedAssumptions, loadLocalProfiles, loadOperations, loadPeople, loadSavedScenarios, normalizeOperations, saveApproval, saveConfiguration, saveImportedAssumptions, saveOperations, savePeople, saveScenario, saveScenarioList, setActiveProfile, workspaceStorageKey } from './storage/scenarios';
+import { parseTsimWorkbook } from './domain/workbookImport';
 import './styles.css';
 
 const navItems = [
@@ -89,7 +90,7 @@ function ScenarioCard({ id, title, kicker, value, detail, active, tone, onClick 
   );
 }
 
-function PeopleView({ cargoList, encargos, onSaveConfiguration, onResetConfiguration, saved }) {
+function PeopleView({ cargoList, encargos, people = [], onSaveConfiguration, onResetConfiguration, saved }) {
   const [draftCargos, setDraftCargos] = useState(() => cargoList.map((cargo) => ({ ...cargo })));
   const [draftEncargos, setDraftEncargos] = useState(Math.round(encargos * 100));
   const [message, setMessage] = useState('');
@@ -97,6 +98,11 @@ function PeopleView({ cargoList, encargos, onSaveConfiguration, onResetConfigura
   const fileInputRef = useRef(null);
   const totalMonthly = draftCargos.reduce((sum, cargo) => sum + custo(cargo, draftEncargos / 100), 0);
   const hasChanges = draftEncargos !== Math.round(encargos * 100) || draftCargos.some((cargo, index) => cargo.salary !== cargoList[index].salary);
+
+  useEffect(() => {
+    setDraftCargos(cargoList.map((cargo) => ({ ...cargo })));
+    setDraftEncargos(Math.round(encargos * 100));
+  }, [cargoList, encargos]);
 
   function updateSalary(id, value) {
     setDraftCargos((current) => current.map((cargo) => cargo.id === id ? { ...cargo, salary: Math.max(0, Number(value) || 0) } : cargo));
@@ -172,6 +178,7 @@ function PeopleView({ cargoList, encargos, onSaveConfiguration, onResetConfigura
       <section className="metric-grid"><Metric label="Cargos cadastrados" value={draftCargos.length} detail="níveis de fibra óptica" tone="blue" icon={Layers3} /><Metric label="Custo mensal total" value={money(totalMonthly)} detail="salário + encargos configurados" tone="green" icon={BarChart3} /><Metric label="Amplitude salarial" value={`${Math.round((draftCargos.at(-1).salary / Math.max(1, draftCargos[0].salary) - 1) * 100)}%`} detail="entre nível I e nível VI" tone="violet" icon={ArrowUpRight} /><Metric label="Premissa de encargos" value={`${draftEncargos}%`} detail="editável · aplicada no simulador" tone="orange" icon={ClipboardCheck} /></section>
       <section className="panel-surface assumptions-editor"><div className="assumptions-editor-title"><div><span className="section-index">01</span><div><h2>Premissas salariais</h2><p>Valores de referência editáveis. O custo empresa é recalculado automaticamente.</p></div></div><div className="editor-toolbar"><input ref={fileInputRef} hidden type="file" accept=".xlsx,.xls,.csv" onChange={importSpreadsheet} /><a className="secondary-button" href="/templates/tsim-planilha-padrao.xlsx" download>Baixar padrão</a><button className="secondary-button" onClick={() => fileInputRef.current?.click()}>Importar planilha</button><label className="encargo-field"><span>Encargos (%)</span><input aria-label="Percentual de encargos" type="number" min="0" step="0.1" value={draftEncargos} onChange={(event) => setDraftEncargos(Math.max(0, Number(event.target.value) || 0))} /></label></div></div><div className="people-table-wrap"><table className="people-table editable-table"><thead><tr><th>Cargo</th><th>Nível</th><th>Salário base editável</th><th>Encargos</th><th>Custo empresa / mês</th><th>Fonte e vigência</th></tr></thead><tbody>{draftCargos.map((cargo) => { const total = custo(cargo, draftEncargos / 100); return <tr key={cargo.id}><td><strong>{cargo.name}</strong><small>{cargo.short}</small></td><td><span className={`level-tag level-${cargo.tone}`}>{cargo.level}</span></td><td><label className="salary-input"><span>R$</span><input aria-label={`Salário base ${cargo.short}`} type="number" min="0" step="0.01" value={cargo.salary} onChange={(event) => updateSalary(cargo.id, event.target.value)} /></label></td><td>{money(total - cargo.salary)}</td><td><strong>{money(total)}</strong></td><td><span className="source-type">{cargo.source || 'Base de referência'}</span><small className="source-validity">{cargo.validity || 'Vigência a confirmar'}</small></td></tr>; })}</tbody></table></div><div className="editor-actions"><div><strong>{importMessage || message || (hasChanges ? 'Há alterações ainda não salvas.' : 'Premissas vinculadas à fonte de referência.')}</strong><span>Salvamento local neste navegador</span></div><div><button className="secondary-button" onClick={resetChanges}>Restaurar referência</button><button className="primary-button editor-save" onClick={saveChanges} disabled={!hasChanges}>Salvar premissas</button></div></div></section>
       <section className="people-grid people-insight-row"><aside className="panel-surface people-side-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Leitura da grade</h2><p>Indicadores recalculados</p></div></div></div><div className="grade-insights"><div><span>Menor salário base</span><strong>{money(draftCargos[0].salary)}</strong><small>{draftCargos[0].name}</small></div><div><span>Maior salário base</span><strong>{money(draftCargos.at(-1).salary)}</strong><small>{draftCargos.at(-1).name}</small></div><div><span>Maior salto entre níveis</span><strong>{money(draftCargos[1].salary - draftCargos[0].salary)}</strong><small>Auxiliar → Técnico II</small></div></div></aside><div className="panel-note people-note"><ClipboardCheck size={16} /><span>Configuração provisória em armazenamento local. Benefícios, ADM, BDI e custos de operação permanecem para o módulo Budget. Valores de RH devem ser validados antes de aprovação.</span></div></section>
+      <section className="panel-surface people-roster-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Pessoas da base local</h2><p>{people.length} registro(s) importado(s) neste perfil do navegador</p></div></div></div>{people.length ? <div className="dimension-table-wrap"><table className="dimension-table people-roster-table"><caption className="sr-only">Pessoas importadas da planilha</caption><thead><tr><th>Nome</th><th>Matrícula</th><th>Cargo</th><th>Região</th><th>Turno</th><th>Atividade</th><th>Status</th><th>Salário base</th></tr></thead><tbody>{people.map((person) => <tr key={person.id}><td><strong>{person.name}</strong><small>{person.email || 'E-mail não informado'}</small></td><td>{person.employeeId || '—'}</td><td>{person.role || '—'}{person.level ? <small>{person.level}</small> : null}</td><td>{person.region || '—'}</td><td>{person.shift || '—'}</td><td>{person.activity || '—'}</td><td>{person.status || '—'}</td><td>{person.salary === null || person.salary === undefined ? '—' : money(person.salary)}</td></tr>)}</tbody></table></div> : <div className="empty-state"><UsersRound size={22} /><strong>Nenhuma pessoa importada</strong><p>Use Configurações → Importar planilha completa para carregar a aba Pessoas neste perfil local.</p></div>}</section>
     </>
   );
 }
@@ -179,7 +186,7 @@ function PeopleView({ cargoList, encargos, onSaveConfiguration, onResetConfigura
 function ScenariosView({ savedScenarios, onRestore, onGoSimulator }) {
   return (
     <>
-      <section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> BIBLIOTECA DE CENÁRIOS</div><h1>Decisões que<br /><em>continuam salvas.</em></h1><p>Reabra uma simulação para continuar a análise, ajustar a quantidade manual ou preparar a aprovação.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Persistência local</div><strong>{savedScenarios.length} cenário{savedScenarios.length === 1 ? '' : 's'} salvo{savedScenarios.length === 1 ? '' : 's'}</strong><span>Pronto para migrar para banco de dados</span><button onClick={onGoSimulator}>Criar novo cenário <ChevronRight size={14} /></button></div></section>
+      <section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> BIBLIOTECA DE CENÁRIOS</div><h1>Decisões que<br /><em>continuam salvas.</em></h1><p>Reabra uma simulação para continuar a análise, ajustar a quantidade manual ou preparar a aprovação.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Persistência local</div><strong>{savedScenarios.length} cenário{savedScenarios.length === 1 ? '' : 's'} salvo{savedScenarios.length === 1 ? '' : 's'}</strong><span>Separado por perfil local</span><button onClick={onGoSimulator}>Criar novo cenário <ChevronRight size={14} /></button></div></section>
       <section className="metric-grid"><Metric label="Cenários salvos" value={savedScenarios.length} detail="nesta sessão local" tone="blue" icon={Layers3} /><Metric label="Último movimento" value={savedScenarios[0] ? savedScenarios[0].name : '—'} detail={savedScenarios[0] ? new Date(savedScenarios[0].savedAt).toLocaleDateString('pt-BR') : 'nenhum cenário salvo'} tone="green" icon={ClipboardCheck} /><Metric label="Modo manual" value={savedScenarios.filter((scenario) => scenario.manualMode).length} detail="com ajuste de promoções" tone="orange" icon={SlidersHorizontal} /><Metric label="Fonte" value="MVP local" detail="persistência temporária" tone="violet" icon={BookOpen} /></section>
       <section className="panel-surface scenarios-library"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Histórico de simulações</h2><p>Selecione um cenário para restaurar os parâmetros.</p></div></div></div>{savedScenarios.length === 0 ? <div className="empty-state"><Layers3 size={25} /><strong>Nenhum cenário salvo ainda</strong><p>Execute uma simulação e use “Salvar cenário” para começar a biblioteca.</p><button className="primary-button compact-button" onClick={onGoSimulator}>Abrir simulador</button></div> : <div className="scenario-library-list">{savedScenarios.map((scenario) => <article className="scenario-library-item" key={scenario.id}><div className="scenario-library-main"><div className="scenario-library-icon"><ArrowUpRight size={16} /></div><div><strong>{scenario.name}</strong><span>{scenario.quantity} posição{scenario.quantity === 1 ? '' : 'ões'} · {scenario.automaticPromotions} automáticas{scenario.manualMode ? ` · ${scenario.appliedPromotions} manuais` : ''}</span></div></div><div className="scenario-library-result"><strong>{money(scenario.appliedBalance)}</strong><span>saldo mensal aplicado</span></div><div className="scenario-library-date">{new Date(scenario.savedAt).toLocaleDateString('pt-BR')}<button onClick={() => onRestore(scenario)}>Reabrir <ChevronRight size={13} /></button></div></article>)}</div>}</section>
     </>
@@ -207,6 +214,10 @@ function OperationsView({ operations, onSave, calc, quantity }) {
   const dimensionResult = calculateDimensionCoverage(draft.dimensions, quantity);
   const coverageResult = calculateCoverage({ ...draft, quantity });
   const { current: coverage, afterMovement: projectedCoverage, risk, safetyTarget } = coverageResult;
+
+  useEffect(() => {
+    setDraft({ ...operations, dimensions: operations.dimensions ?? [] });
+  }, [operations]);
 
   function update(field, value) {
     setDraft((current) => ({ ...current, [field]: Math.max(0, Number(value) || 0) }));
@@ -381,25 +392,33 @@ function BudgetView({ calc, cargoList, encargos }) {
   return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> BUDGET</div><h1>Veja o custo<br /><em>antes do compromisso.</em></h1><p>Separe a folha de cargos dos custos operacionais e compare a decisão no horizonte escolhido.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Horizonte de análise</div><strong>{horizon} meses</strong><span>Valores anualizados a partir do cenário atual</span><button onClick={() => setHorizon(horizon === 12 ? 24 : 12)}>Alternar horizonte <ChevronRight size={14} /></button></div></section><section className="metric-grid"><Metric label="Folha de referência" value={money(payrollReference)} detail="grade salarial + encargos People" tone="blue" icon={BarChart3} /><Metric label="Folha após cenário" value={money(payrollAfter)} detail={`${horizon} meses: ${money(payrollAfter * horizon)}`} tone={payrollAfter <= payrollReference ? 'green' : 'orange'} icon={ArrowDownRight} /><Metric label="Saldo aplicado" value={money(calc.appliedBalance)} detail={`${horizon} meses: ${money(calc.appliedBalance * horizon)}`} tone={calc.appliedBalance >= 0 ? 'green' : 'orange'} icon={DollarSign} /><Metric label="Receita equivalente" value={equivalentRevenue ? money(equivalentRevenue) : 'Não necessária'} detail="estimada a 15% de margem" tone="violet" icon={Sparkles} /></section><section className="budget-grid"><div className="panel-surface budget-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Waterfall da movimentação</h2><p>Folha atual → desligamentos → promoções → folha projetada</p></div></div></div><div className="budget-waterfall"><div><span>Folha atual</span><strong>{money(payrollReference)}</strong></div><div className="waterfall-negative"><span>Economia de desligamentos</span><strong>− {money(calc.economy)}</strong></div><div className="waterfall-positive"><span>Custo de promoções</span><strong>+ {money(calc.appliedPromotions * Math.max(calc.delta, 0))}</strong></div><div className="waterfall-total"><span>Folha projetada</span><strong>{money(payrollAfter)}</strong></div></div><div className="budget-formula"><span>Fórmula</span><code>folha projetada = folha atual − economia + promoções</code></div></div><aside className="panel-surface budget-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Premissas financeiras</h2><p>Classificação, vigência e origem mantidas visíveis</p></div></div></div><div className="assumption-list">{costAssumptions.map((assumption) => <div key={assumption.label}><div><strong>{assumption.label}</strong><span>{assumption.classification} · {assumption.validity} · {assumption.source}</span></div><b>{assumption.value}{assumption.unit}</b></div>)}</div><div className="panel-note"><Database size={16} /><span>O custo operacional completo está disponível no módulo Analytics e permanece separado da regra simplificada de cargos.</span></div></aside></section></>;
 }
 
-function AnalyticsView({ savedScenarios }) {
+function AnalyticsView({ savedScenarios, operations }) {
   const [sourceMessage, setSourceMessage] = useState('');
-  const totalOperational = operationalCosts.reduce((sum, item) => sum + item.monthlyCost, 0);
-  const rateioHeadcount = operationalSource.headcountBases.find((item) => item.id === 'custos-equipes')?.headcount ?? 0;
-  const comparisonHeadcount = operationalSource.headcountBases.find((item) => item.id === 'controle-local')?.headcount ?? 0;
+  const costs = operations.costs?.length ? operations.costs : operationalCosts;
+  const headcountBases = operations.headcountBases?.length ? operations.headcountBases : operationalSource.headcountBases;
+  const rateioHeadcount = headcountBases.find((item) => /custos|oficial/i.test(`${item.id} ${item.label}`))?.headcount ?? 0;
+  const comparisonHeadcount = headcountBases.find((item) => /controle|comparacao/i.test(`${item.id} ${item.label}`))?.headcount ?? 0;
+  const totalOperational = costs.reduce((sum, item) => sum + (Number(item.monthlyCost) || 0), 0);
   const headcountDifference = rateioHeadcount - comparisonHeadcount;
-  const maxCost = Math.max(...operationalCosts.map((item) => item.monthlyCost));
-  return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> ANALYTICS</div><h1>Custos e operação<br /><em>na mesma leitura.</em></h1><p>Use os dados operacionais da planilha de custos para contextualizar a decisão de pessoas e identificar concentração de impacto.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Fonte operacional</div><strong>V.TAL · 2025</strong><span>Custos Equipes, Controle Local e sala técnica</span><button onClick={() => setSourceMessage('Fonte: Cópia de Custos e Preço V3 · Encargos atualizados')}>Ver fonte <ChevronRight size={14} /></button>{sourceMessage && <small className="source-message">{sourceMessage}</small>}</div></section><section className="metric-grid"><Metric label="Custo operacional mensal" value={money(totalOperational)} detail="base de referência · / mês" tone="blue" icon={BarChart3} /><Metric label="HC base operacional" value={rateioHeadcount} detail="Custos Equipes · base oficial" tone="violet" icon={UsersRound} /><Metric label="HC Controle Local" value={comparisonHeadcount} detail={`comparação · diferença de ${headcountDifference} HC`} tone="orange" icon={TriangleAlert} /><Metric label="Cenários disponíveis" value={savedScenarios.length} detail="para cruzar com operação" tone="green" icon={Layers3} /></section><section className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Custos por contexto</h2><p>Valores mensais de referência da fonte operacional</p></div></div><span className="source-chip"><span /> Fonte rastreada</span></div><div className="analytics-bars">{operationalCosts.map((item) => <div className="analytics-bar-row" key={item.id}><div className="analytics-bar-label"><strong>{item.label}</strong><small>{item.headcount} HC informado · {item.classification} · {item.validity} · {item.source}</small></div><div className="analytics-track"><span style={{ width: `${(item.monthlyCost / maxCost) * 100}%` }} /></div><b>{money(item.monthlyCost, true)}<small className="metric-unit"> / mês</small></b></div>)}</div><div className="panel-note"><Database size={16} /><span>{operationalSource.reconciliation} O rateio operacional e a cobertura usam {rateioHeadcount} HC.</span></div></section><section className="analytics-grid"><div className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Classes de equipe</h2><p>Custo de referência por equipe · mês</p></div></div></div><div className="class-table">{teamClasses.map((item) => <div key={item.id}><strong>{item.label}</strong><span>{item.headcount} HC · {item.teamCount} equipes · {item.classification} · {item.validity}</span><b>{money(item.unitCost)}<small className="metric-unit"> / equipe</small></b></div>)}</div></div><div className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Leitura executiva</h2><p>Pontos para validação</p></div></div></div><div className="insight-list analytics-insights"><div className="insight-item"><span className="insight-number">01</span><div><strong>Contextos não devem ser misturados</strong><p>A grade de cargos usa 113% de encargos; a operação usa 128%, ADM e BDI próprios.</p></div></div><div className="insight-item"><span className="insight-number">02</span><div><strong>Base operacional definida</strong><p>O T-Sim usa 672 HC de Custos Equipes para cobertura e rateio. Os 609 HC do Controle Local ficam como referência comparativa.</p></div></div><div className="insight-item"><span className="insight-number">03</span><div><strong>ROI permanece estimado</strong><p>Sem histórico de retenção, produtividade e turnover, a recomendação deve permanecer indicativa.</p></div></div></div></div></section></>;
+  const maxCost = Math.max(...costs.map((item) => Number(item.monthlyCost) || 0), 1);
+  const importedClasses = costs.filter((item) => /classe/i.test(item.label || '') && (item.unitCost || item.headcount));
+  const classRows = importedClasses.length ? importedClasses : teamClasses;
+  return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> ANALYTICS</div><h1>Custos e operação<br /><em>na mesma leitura.</em></h1><p>Use os dados operacionais da planilha de custos para contextualizar a decisão de pessoas e identificar concentração de impacto.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Fonte operacional</div><strong>{operations.basisSource || 'V.TAL · 2025'}</strong><span>Custos, headcount e dimensões do perfil atual</span><button onClick={() => setSourceMessage('A fonte exibida vem da importação local mais recente.')}>Ver fonte <ChevronRight size={14} /></button>{sourceMessage && <small className="source-message">{sourceMessage}</small>}</div></section><section className="metric-grid"><Metric label="Custo operacional mensal" value={money(totalOperational)} detail="base de referência · / mês" tone="blue" icon={BarChart3} /><Metric label="HC base operacional" value={rateioHeadcount} detail="Custos Equipes · base oficial" tone="violet" icon={UsersRound} /><Metric label="HC Controle Local" value={comparisonHeadcount} detail={`comparação · diferença de ${headcountDifference} HC`} tone="orange" icon={TriangleAlert} /><Metric label="Cenários disponíveis" value={savedScenarios.length} detail="para cruzar com operação" tone="green" icon={Layers3} /></section><section className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Custos por contexto</h2><p>Valores mensais de referência da fonte operacional</p></div></div><span className="source-chip"><span /> Fonte rastreada</span></div><div className="analytics-bars">{costs.map((item) => <div className="analytics-bar-row" key={item.id}><div className="analytics-bar-label"><strong>{item.label}</strong><small>{item.headcount} HC informado · {item.classification} · {item.validity} · {item.source}</small></div><div className="analytics-track"><span style={{ width: `${((Number(item.monthlyCost) || 0) / maxCost) * 100}%` }} /></div><b>{money(Number(item.monthlyCost) || 0, true)}<small className="metric-unit"> / mês</small></b></div>)}</div><div className="panel-note"><Database size={16} /><span>{operations.basisSource || operationalSource.reconciliation} O rateio operacional e a cobertura usam {rateioHeadcount} HC.</span></div></section><section className="analytics-grid"><div className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Classes de equipe</h2><p>Custo de referência por equipe · mês</p></div></div></div><div className="class-table">{classRows.map((item) => <div key={item.id}><strong>{item.label}</strong><span>{item.headcount || 0} HC · {item.teamCount || '—'} equipes · {item.classification || 'Informada'} · {item.validity || 'A informar'}</span><b>{money(item.unitCost || 0)}<small className="metric-unit"> / equipe</small></b></div>)}</div></div><div className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Leitura executiva</h2><p>Pontos para validação</p></div></div></div><div className="insight-list analytics-insights"><div className="insight-item"><span className="insight-number">01</span><div><strong>Contextos não devem ser misturados</strong><p>A grade de cargos usa 113% de encargos; a operação pode usar encargos, ADM e BDI próprios.</p></div></div><div className="insight-item"><span className="insight-number">02</span><div><strong>Base operacional definida</strong><p>O rateio usa a base oficial importada; referências comparativas permanecem visíveis.</p></div></div><div className="insight-item"><span className="insight-number">03</span><div><strong>ROI permanece estimado</strong><p>Sem histórico de retenção, produtividade e turnover, a recomendação deve permanecer indicativa.</p></div></div></div></div></section></>;
 }
 
-function SettingsView({ configuration, operations, savedScenarios, approvals, onResetConfiguration, onClearWorkspace, onRestoreWorkspace }) {
+function SettingsView({ configuration, operations, savedScenarios, approvals, people, assumptions, profiles, activeProfileId, onProfileChange, onCreateProfile, onResetConfiguration, onClearWorkspace, onRestoreWorkspace, onImportWorkbook }) {
   const [message, setMessage] = useState('');
   const fileInputRef = useRef(null);
 
   function reset() { onResetConfiguration(); setMessage('Premissas de cargos restauradas.'); }
   function clear() { if (!window.confirm('Limpar toda a configuração local, cenários, aprovações e operações deste navegador?')) return; onClearWorkspace(); setMessage('Dados locais do ambiente restaurados para a referência inicial.'); }
-  function exportWorkspace() { const payload = { produto: 'T-Sim', schemaVersion: 1, exportedAt: new Date().toISOString(), configuration, operations, savedScenarios, approvals }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'tsim-workspace-backup.json'; anchor.click(); URL.revokeObjectURL(url); setMessage('Backup local exportado.'); }
+  function exportWorkspace() { const payload = { produto: 'T-Sim', schemaVersion: 2, exportedAt: new Date().toISOString(), configuration, operations, savedScenarios, approvals, people, assumptions }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'tsim-workspace-backup.json'; anchor.click(); URL.revokeObjectURL(url); setMessage('Backup local exportado.'); }
+  const workbookInputRef = useRef(null);
+  const [profileName, setProfileName] = useState('');
   async function importWorkspace(event) { const file = event.target.files?.[0]; if (!file) return; try { const payload = JSON.parse(await file.text()); if (payload?.produto !== 'T-Sim' || !payload.configuration?.cargos || !payload.operations) throw new Error('invalid'); onRestoreWorkspace(payload); setMessage('Backup restaurado neste navegador.'); } catch { setMessage('Arquivo inválido. Escolha um backup JSON exportado pelo T-Sim.'); } finally { event.target.value = ''; } }
-  return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> CONFIGURAÇÕES</div><h1>Controle as<br /><em>premissas locais.</em></h1><p>O T-Sim usa uma base própria por ambiente. Os dados importados ficam disponíveis somente neste navegador e não são enviados a outro sistema.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Ambiente atual</div><strong>Base própria · local</strong><span>Dados disponíveis neste aparelho</span><button onClick={() => setMessage('O T-Sim está operando com a base própria local deste navegador.')}>Ver status <ChevronRight size={14} /></button></div></section><section className="settings-grid"><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Base própria e governança</h2><p>Dados carregados pelo usuário</p></div></div></div><div className="settings-list"><div><span>Ambiente</span><strong>Base T-Sim · usuário atual</strong></div><div><span>Persistência</span><strong>localStorage · navegador atual</strong></div><div><span>Compartilhamento externo</span><strong>Desativado</strong></div><div><span>Classificação dos resultados</span><strong>Informados, calculados e estimados</strong></div></div></div><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Planilha padrão</h2><p>Alimente a base do seu ambiente</p></div></div></div><div className="settings-actions"><a className="secondary-button" href="/templates/tsim-planilha-padrao.xlsx" download>Baixar planilha padrão</a><button className="secondary-button" onClick={reset}>Restaurar cargos e encargos</button><button className="secondary-button" onClick={clear}>Limpar dados locais</button></div><div className="settings-backup"><input ref={fileInputRef} hidden type="file" accept="application/json,.json" onChange={importWorkspace} /><button className="secondary-button" onClick={exportWorkspace}>Exportar backup JSON</button><button className="secondary-button" onClick={() => fileInputRef.current?.click()}>Restaurar backup JSON</button></div>{message && <div className="settings-message"><Check size={15} />{message}</div>}<div className="panel-note"><ShieldCheck size={16} /><span>Preencha as abas Cargos e Operação da planilha, importe-as nas telas correspondentes e revise os dados antes de salvar.</span></div></div></section></>;
+  async function importWorkbook(event) { const file = event.target.files?.[0]; if (!file) return; try { const result = await onImportWorkbook(file); setMessage(`Planilha importada: ${result.counts.cargos} cargos, ${result.counts.people} pessoas, ${result.counts.assumptions} premissas, ${result.counts.dimensions} dimensões, ${result.counts.costs} custos e ${result.counts.scenarios} cenários.`); } catch (error) { setMessage(error.message || 'Não foi possível importar a planilha completa.'); } finally { event.target.value = ''; } }
+  function createProfile() { const profile = onCreateProfile(profileName); if (profile) { setProfileName(''); setMessage(`Perfil local “${profile.name}” criado.`); } }
+  return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> CONFIGURAÇÕES</div><h1>Controle as<br /><em>premissas locais.</em></h1><p>O T-Sim usa uma base própria por ambiente. Os dados importados ficam disponíveis somente neste navegador e não são enviados a outro sistema.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Ambiente atual</div><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base própria · local'}</strong><span>Dados disponíveis neste aparelho</span><button onClick={() => setMessage('O T-Sim está operando com a base própria local deste navegador.')}>Ver status <ChevronRight size={14} /></button></div></section><section className="settings-grid"><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Base própria e governança</h2><p>Dados carregados pelo usuário</p></div></div></div><div className="settings-list"><div><span>Ambiente</span><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base T-Sim · usuário atual'}</strong></div><div><span>Persistência</span><strong>localStorage · perfil local selecionado</strong></div><div><span>Compartilhamento externo</span><strong>Desativado</strong></div><div><span>Registros importados</span><strong>{people.length} pessoas · {assumptions.length} premissas</strong></div><div><span>Classificação dos resultados</span><strong>Informados, calculados e estimados</strong></div></div><div className="profile-switcher"><label><span>Perfil local</span><select value={activeProfileId} onChange={(event) => onProfileChange(event.target.value)}>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label><div className="profile-create"><input value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Nome da nova base" /><button className="secondary-button" type="button" onClick={createProfile}>Criar perfil</button></div></div></div><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Planilha padrão</h2><p>Alimente todas as áreas do seu ambiente</p></div></div></div><div className="settings-actions"><a className="secondary-button" href="/templates/tsim-planilha-padrao.xlsx" download>Baixar planilha padrão</a><input ref={workbookInputRef} hidden type="file" accept=".xlsx,.xls,.csv" onChange={importWorkbook} /><button className="secondary-button" onClick={() => workbookInputRef.current?.click()}>Importar planilha completa</button><button className="secondary-button" onClick={reset}>Restaurar cargos e encargos</button><button className="secondary-button" onClick={clear}>Limpar dados locais</button></div><div className="settings-backup"><input ref={fileInputRef} hidden type="file" accept="application/json,.json" onChange={importWorkspace} /><button className="secondary-button" onClick={exportWorkspace}>Exportar backup JSON</button><button className="secondary-button" onClick={() => fileInputRef.current?.click()}>Restaurar backup JSON</button></div>{message && <div className="settings-message"><Check size={15} />{message}</div>}<div className="panel-note"><ShieldCheck size={16} /><span>As abas Cargos, Pessoas, Premissas, Operação e Cenários são processadas localmente. Revise fonte, vigência e cobertura antes de salvar.</span></div></div></section></>;
 }
 function AiView({ calc, operations }) {
   const coverage = calculateCoverage({ ...operations, quantity: 1 });
@@ -473,6 +492,8 @@ function EntryExperience({ stage, onStageChange, onEnter }) {
 }
 
 function App() {
+  const [profiles, setProfiles] = useState(() => loadLocalProfiles());
+  const [activeProfileId, setActiveProfileIdState] = useState(() => getActiveProfileId());
   const [configuration, setConfiguration] = useState(() => loadConfiguration({ cargos, encargos: 1.13 }));
   const configuredCargos = configuration.cargos;
   const configuredEncargos = configuration.encargos;
@@ -491,6 +512,8 @@ function App() {
   const [savedScenarios, setSavedScenarios] = useState(() => loadSavedScenarios());
   const [operations, setOperations] = useState(() => loadOperations(operationsDefaults));
   const [approvals, setApprovals] = useState(() => loadApprovals());
+  const [people, setPeople] = useState(() => loadPeople());
+  const [assumptions, setAssumptions] = useState(() => loadImportedAssumptions());
   const [saveMessage, setSaveMessage] = useState('');
   const [theme, setTheme] = useState(() => window.localStorage.getItem('tsim.theme.v1') || 'light');
 
@@ -523,7 +546,7 @@ function App() {
   }
 
   function handleResetConfiguration() {
-    window.localStorage.removeItem('tsim.configuration.v1');
+    window.localStorage.removeItem(workspaceStorageKey('tsim.configuration.v1'));
     const nextConfiguration = { cargos: cargos.map((cargo) => ({ ...cargo })), encargos: 1.13 };
     setConfiguration(nextConfiguration);
   }
@@ -539,24 +562,72 @@ function App() {
   }
 
   function handleClearWorkspace() {
-    ['tsim.configuration.v1', 'tsim.saved-scenarios.v1', 'tsim.operations.v1', 'tsim.approvals.v1'].forEach((key) => window.localStorage.removeItem(key));
+    ['tsim.configuration.v1', 'tsim.saved-scenarios.v1', 'tsim.operations.v1', 'tsim.approvals.v1', 'tsim.people.v1', 'tsim.imported-assumptions.v1'].forEach((key) => window.localStorage.removeItem(workspaceStorageKey(key)));
     const nextOperations = { ...operationsDefaults };
     setConfiguration({ cargos: cargos.map((cargo) => ({ ...cargo })), encargos: 1.13 });
     setSavedScenarios([]);
     setOperations(nextOperations);
     setApprovals({});
+    setPeople([]);
+    setAssumptions([]);
   }
 
   function handleRestoreWorkspace(payload) {
     saveConfiguration(payload.configuration);
     const nextOperations = normalizeOperations(payload.operations, operationsDefaults);
     saveOperations(nextOperations);
-    window.localStorage.setItem('tsim.saved-scenarios.v1', JSON.stringify(payload.savedScenarios ?? []));
-    window.localStorage.setItem('tsim.approvals.v1', JSON.stringify(payload.approvals ?? {}));
+    saveScenarioList(payload.savedScenarios ?? []);
+    savePeople(payload.people ?? []);
+    saveImportedAssumptions(payload.assumptions ?? []);
+    window.localStorage.setItem(workspaceStorageKey('tsim.approvals.v1'), JSON.stringify(payload.approvals ?? {}));
     setConfiguration(payload.configuration);
     setOperations(nextOperations);
     setSavedScenarios(payload.savedScenarios ?? []);
     setApprovals(payload.approvals ?? {});
+    setPeople(payload.people ?? []);
+    setAssumptions(payload.assumptions ?? []);
+  }
+
+  function handleProfileChange(profileId) {
+    if (!setActiveProfile(profileId)) return;
+    setActiveProfileIdState(profileId);
+    setConfiguration(loadConfiguration({ cargos, encargos: 1.13 }));
+    setOperations(loadOperations(operationsDefaults));
+    setSavedScenarios(loadSavedScenarios());
+    setApprovals(loadApprovals());
+    setPeople(loadPeople());
+    setAssumptions(loadImportedAssumptions());
+    setSaveMessage('Perfil local alterado.');
+  }
+
+  function handleCreateProfile(name) {
+    const profile = createLocalProfile(name);
+    if (profile) setProfiles(loadLocalProfiles());
+    return profile;
+  }
+
+  async function handleImportWorkbook(file) {
+    const XLSX = await import('xlsx');
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+    const sheets = Object.fromEntries(workbook.SheetNames.map((name) => [name, XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: null })]));
+    const result = parseTsimWorkbook(sheets, { configuration, operations });
+    if (!result.counts.cargos && !result.counts.people && !result.counts.assumptions && !result.counts.dimensions && !result.counts.costs && !result.counts.scenarios) throw new Error('Nenhuma aba compatível ou linha preenchida foi encontrada.');
+    const nextConfiguration = result.configuration;
+    const nextOperations = normalizeOperations(result.operations, operationsDefaults);
+    saveConfiguration(nextConfiguration);
+    saveOperations(nextOperations);
+    savePeople(result.people);
+    saveImportedAssumptions(result.assumptions);
+    saveScenarioList(result.scenarios);
+    const importedApprovals = Object.fromEntries(result.scenarios.filter((scenario) => scenario.importedStatus).map((scenario) => [scenario.id, { status: scenario.importedStatus.includes('aprov') ? 'Aprovado' : scenario.importedStatus.includes('envi') ? 'Enviado' : 'Rascunho', updatedAt: new Date().toISOString() }]));
+    window.localStorage.setItem(workspaceStorageKey('tsim.approvals.v1'), JSON.stringify(importedApprovals));
+    setConfiguration(nextConfiguration);
+    setOperations(nextOperations);
+    setPeople(result.people);
+    setAssumptions(result.assumptions);
+    setSavedScenarios(result.scenarios);
+    setApprovals(importedApprovals);
+    return result;
   }
 
   function snapshotScenario() {
@@ -653,7 +724,7 @@ function App() {
 
         <button className="workspace-select" type="button" aria-label="Abrir configurações do ambiente" onClick={() => setActiveView('settings')}>
           <div className="workspace-orb">TS</div>
-          <div className="workspace-copy"><span>Ambiente local</span><strong>Base T-Sim · Bahia</strong></div>
+          <div className="workspace-copy"><span>Ambiente local</span><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base T-Sim · Bahia'}</strong></div>
           <ChevronRight size={15} aria-hidden="true" />
         </button>
 
@@ -684,7 +755,7 @@ function App() {
         </header>
 
         <div className="content-wrap" id="workspace-content" tabIndex="-1">
-          {activeView === 'people' ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} onSaveConfiguration={handleSaveConfiguration} onResetConfiguration={handleResetConfiguration} saved={Boolean(window.localStorage.getItem('tsim.configuration.v1'))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} /> : activeView === 'presentation' ? <InstitutionalView onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'ops' ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' ? <AnalyticsView savedScenarios={savedScenarios} /> : activeView === 'ai' ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' ? <SettingsView configuration={configuration} operations={operations} savedScenarios={savedScenarios} approvals={approvals} onResetConfiguration={handleResetConfiguration} onClearWorkspace={handleClearWorkspace} onRestoreWorkspace={handleRestoreWorkspace} /> : <>
+          {activeView === 'people' ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} people={people} onSaveConfiguration={handleSaveConfiguration} onResetConfiguration={handleResetConfiguration} saved={Boolean(window.localStorage.getItem(workspaceStorageKey('tsim.configuration.v1')))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} /> : activeView === 'presentation' ? <InstitutionalView onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'ops' ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' ? <AnalyticsView savedScenarios={savedScenarios} operations={operations} /> : activeView === 'ai' ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' ? <SettingsView configuration={configuration} operations={operations} savedScenarios={savedScenarios} approvals={approvals} people={people} assumptions={assumptions} profiles={profiles} activeProfileId={activeProfileId} onProfileChange={handleProfileChange} onCreateProfile={handleCreateProfile} onResetConfiguration={handleResetConfiguration} onClearWorkspace={handleClearWorkspace} onRestoreWorkspace={handleRestoreWorkspace} onImportWorkbook={handleImportWorkbook} /> : <>
           <section className="hero-intro">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> SIMULADOR DE DECISÃO</div>

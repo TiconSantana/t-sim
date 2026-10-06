@@ -6,6 +6,10 @@
 **Plataforma:** T-Sim  
 **Módulos:** People, Budget, Ops, Analytics e AI
 
+## Estado atual do MVP local
+
+O MVP publicado opera como uma base própria do T-Sim, sem login, Supabase ou vínculo com o TConnect. Cada navegador pode manter perfis locais separados; a planilha padrão e o backup JSON são os meios de transporte entre aparelhos. A arquitetura multiusuário descrita adiante é uma evolução futura e não é requisito para o fluxo atual.
+
 ## 1. Objetivo do produto
 
 Permitir que RH, Controladoria, Operações e Diretoria simulem movimentações de cargos e equipes, comparem cenários financeiros e operacionais e registrem uma decisão auditável.
@@ -309,6 +313,7 @@ O protótipo executável atual cobre as fatias locais de People, Simulador, Cen�
 Ops e Pareceres:
 
 - a grade dos seis cargos e os encargos podem ser editados, restaurados e importados de `.xlsx`, `.xls` ou `.csv`;
+- a planilha padrão pode ser importada em modo completo: cargos, pessoas, premissas, operação, custos operacionais e cenários são distribuídos pelos módulos locais correspondentes;
 - a quantidade automática financiável permanece visível junto do ajuste manual, com comparação e saldo mensal/anual;
 - cenários são salvos e reabertos no navegador, com snapshot de salários e encargos;
 - a Visão Geral consolida a estrutura e os cenários salvos;
@@ -321,6 +326,7 @@ Ops e Pareceres:
 - T-Sim AI apresenta um parecer local baseado em regras, perguntas de validação e classificação explícita como estimativa.
 - Pareceres oferece impressão/PDF pelo navegador, além de JSON e Excel; Configurações oferece backup e restauração do workspace em JSON.
 - Configurações permite recuperar a grade e limpar os dados locais do ambiente demonstrativo.
+- Configurações permite criar perfis locais separados no mesmo navegador, alternar a base ativa e transportar dados por planilha ou backup JSON sem conta externa.
 - O shell web inclui manifesto PWA, ícone instalável, service worker com fallback offline e configuração de rewrite para hospedagem estática.
 - O deploy público está conectado ao GitHub `TiconSantana/t-sim` e à Vercel `t-sim`.
 - O navegador guarda o workspace em `localStorage` e a tela Configurações permite exportar ou restaurar um backup JSON.

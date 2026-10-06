@@ -7,9 +7,10 @@ Arquivo para download: [`public/templates/tsim-planilha-padrao.xlsx`](../public/
 1. Baixe a planilha padrão em **Configurações**, **Base de pessoas** ou **Operação**.
 2. Substitua os exemplos pelos dados do ambiente do próprio usuário.
 3. Preencha a fonte, a vigência e o responsável em cada premissa usada.
-4. Importe a aba **Cargos** em **Base de pessoas**.
-5. Importe a aba **Operação** em **Dimensionamento por contexto**.
+4. Use **Configurações → Importar planilha completa** para carregar Cargos, Pessoas, Premissas, Operação e Cenários de uma vez.
+5. Ou importe somente a aba Cargos em **Base de pessoas** e a aba Operação em **Dimensionamento por contexto**.
 6. Revise os alertas de cobertura e salve as premissas localmente.
+7. Se o mesmo navegador for usado por mais de uma pessoa, crie um **perfil local** separado em Configurações antes de importar.
 
 ## Abas e colunas
 
@@ -17,15 +18,16 @@ Arquivo para download: [`public/templates/tsim-planilha-padrao.xlsx`](../public/
 |---|---|---|
 | Cargos | Grade salarial usada pelo motor | Cargo, Nível, Salário base, Encargos (%), Fonte, Vigência, Responsável, Observação |
 | Operação | Cobertura por região, turno e atividade | Região, Turno, Atividade, Classe de equipe, HC atual, HC requerido, Capacidade por HC, SLA alvo (%), Margem segurança (%), Fonte, Vigência, Responsável, Observação |
-| Pessoas | Cadastro opcional para a evolução do módulo People | Nome, Matrícula, E-mail, Cargo, Nível, Região, Turno, Atividade, Status, Data admissão, Salário base, Observação |
-| Premissas | Parâmetros rastreáveis | Parâmetro, Valor, Unidade, Fonte, Vigência, Responsável, Observação |
-| Cenários | Registro e transporte de simulações | Nome do cenário, Data, cargos, quantidades, promoções automáticas e manuais, saldo e status |
+| Pessoas | Cadastro local exibido em Cargos e pessoas | Nome, Matrícula, E-mail, Cargo, Nível, Região, Turno, Atividade, Status, Data admissão, Salário base, Observação |
+| Premissas | Parâmetros rastreáveis aplicados ao ambiente | Parâmetro, Valor, Unidade, Fonte, Vigência, Responsável, Observação |
+| Cenários | Registro local de simulações reabríveis | Nome do cenário, Data, cargos, quantidades, promoções automáticas e manuais, saldo e status |
 | Leia-me | Instruções de preenchimento e privacidade | Fluxo, unidades, validações e limitações |
 
 ## Regras de importação
 
 - A importação de cargos usa a primeira aba da planilha, identifica a coluna **Salário base** (ou **Remuneração**) e associa o cargo pelo texto da primeira coluna. A aba **Cargos** da planilha padrão já vem com o formato completo e seis linhas de referência.
 - A importação de dimensões procura a aba **Operação** e reconhece os cabeçalhos de região, turno, atividade, HC atual, HC requerido e capacidade por HC.
+- A importação completa também grava Pessoas, Premissas e Cenários no perfil local selecionado; os custos e bases de headcount operacionais importados passam a alimentar o módulo Analytics quando as colunas forem reconhecidas.
 - Linhas incompletas ficam visíveis como pendência; a cobertura pode ser calculada, mas uma aprovação deve permanecer bloqueada até que o rateio seja informado.
 - Encargos, ROI, retenção, turnover, produtividade e payback permanecem classificados conforme a origem: informado, calculado ou estimado.
 
