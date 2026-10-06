@@ -20,10 +20,10 @@ O desenho é técnico e funcional. Não representa fibra óptica literalmente e 
 
 | Ativo | Uso | Arquivo |
 |---|---|---|
-| Logo principal | Sidebar, cabeçalho, PDFs e apresentações | `public/brand/t-sim-logo.svg` |
+| Logo principal | Sidebar, cabeçalho, PDFs e apresentações | `public/brand/t-sim-logo-header.png` (aplicação atual); SVGs mantidos como fallback |
 | Logo para fundo escuro | Sidebar e telas com fundo `ink-950` | `public/brand/t-sim-logo-light.svg` |
 | Logo para fundo claro | PDFs, relatórios e fundos brancos | `public/brand/t-sim-logo-dark.svg` |
-| Símbolo | Favicon, avatar, PWA e espaços quadrados | `public/brand/t-sim-mark.svg` |
+| Símbolo | Favicon, avatar, PWA e espaços quadrados | `public/brand/t-sim-mark.png` (aplicação atual); `public/brand/t-sim-mark.svg` como fallback |
 
 
 ## Paleta semântica

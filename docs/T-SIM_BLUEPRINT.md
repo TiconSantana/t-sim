@@ -316,6 +316,7 @@ Ops e Pareceres:
 - Pareceres registra os estados Rascunho, Enviado e Aprovado e exporta um resumo JSON local.
 - Budget apresenta waterfall da folha e separa as premissas de encargos, ADM, BDI e margem.
 - Analytics apresenta os custos de Campo, Sala Técnica e classes de equipe extraídos da fonte operacional.
+- Analytics mantém separadas as bases de headcount: 609 HC do Controle Local, usado no rateio de sala técnica, e 672 HC orçados na aba Custos Equipes. A diferença de 63 HC aparece como pendência de conciliação e não é somada automaticamente.
 - T-Sim AI apresenta um parecer local baseado em regras, perguntas de validação e classificação explícita como estimativa.
 - Pareceres oferece impressão/PDF pelo navegador, além de JSON e Excel; Configurações oferece backup e restauração do workspace em JSON.
 - Configurações permite recuperar a grade e limpar os dados locais do ambiente demonstrativo.
