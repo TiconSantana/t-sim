@@ -3,14 +3,14 @@ export function calculateCoverage({ teamHeadcount, requiredHeadcount, slaTarget,
   const afterMovement = requiredHeadcount > 0
     ? ((teamHeadcount - Math.min(quantity, teamHeadcount)) / requiredHeadcount) * 100
     : 0;
-  const effectiveTarget = Math.min(100, Math.max(0, slaTarget + safetyBuffer));
-  const risk = afterMovement >= effectiveTarget ? 'Baixo' : afterMovement >= effectiveTarget - 5 ? 'Atenção' : 'Alto';
+  const safetyTarget = Math.min(100, Math.max(0, slaTarget + safetyBuffer));
+  const risk = afterMovement < slaTarget ? 'Alto' : afterMovement < safetyTarget ? 'Atenção' : 'Baixo';
   return {
     current,
     afterMovement,
     risk,
-    effectiveTarget,
-    approvalBlocked: requiredHeadcount > 0 && afterMovement < effectiveTarget,
+    safetyTarget,
+    approvalBlocked: requiredHeadcount > 0 && afterMovement < slaTarget,
   };
 }
 
