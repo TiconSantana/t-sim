@@ -10,7 +10,7 @@ motor de cálculo e a separação entre domínio e interface.
 
 ## Sequência de entrega
 
-**Status atual:** Fases 1–4 implementadas em versão de trabalho; entrada de primeira visita integrada; Fase 5 em validação visual e técnica.
+**Status atual:** Fases 1–5 concluídas em versão de trabalho; validação registrada em `docs/VISUAL_QA_TSIM.md`.
 
 ### Fase 1 — Sistema de marca e ícones
 
@@ -86,6 +86,8 @@ motor de cálculo e a separação entre domínio e interface.
 - Conferir favicon, logo em fundos claro/escuro e ícones PWA.
 - Executar build e revisão de contraste, foco, teclado e responsividade.
 - Apresentar um checkpoint visual para aprovação antes de publicar ou trocar a marca definitiva.
+
+**Saída:** `docs/VISUAL_QA_TSIM.md`, revisão de exportações, impressão/PDF, shell offline e acessibilidade de navegação.
 
 ## Decisões que precisam de aprovação
 

@@ -16,6 +16,12 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/brand/t-sim-mark.png",
+      "sizes": "952x952",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

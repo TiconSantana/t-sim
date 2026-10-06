@@ -1,4 +1,4 @@
-import { custo, findCargo, MESES } from '../data/cargos';
+import { custo, findCargo, MESES } from '../data/cargos.js';
 
 export function calculateSimulation({
   dismissedRole,
