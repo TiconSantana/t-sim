@@ -19,4 +19,4 @@ Cada atualização enviada para a branch `main` gera um novo deploy automático 
 
 ## Próxima evolução
 
-O banco compartilhado já está preparado no Tconnect. Para usar uma conta, ela precisa estar vinculada a um registro de `public.colaborador` da empresa. A vinculação é uma etapa administrativa do Tconnect e não expõe a chave secreta no frontend.
+O banco compartilhado já está preparado no Tconnect. Depois da confirmação do e-mail, o T-Sim tenta vincular automaticamente a conta ao único registro ativo de `public.colaborador` com o mesmo e-mail. Se não houver correspondência única, o sistema bloqueia o acesso compartilhado e informa o motivo.

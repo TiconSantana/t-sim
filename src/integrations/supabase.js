@@ -45,17 +45,25 @@ export async function signOutCloud() {
   if (error) throw error;
 }
 
+export async function linkCloudCollaborator() {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('tsim_link_authenticated_collaborator');
+  if (error) throw error;
+  return data;
+}
+
 async function currentCollaborator() {
   if (!supabase) throw new Error('Supabase não configurado neste ambiente.');
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError) throw authError;
   if (!authData.user) throw new Error('Faça login para acessar o workspace compartilhado.');
+  await linkCloudCollaborator();
   const { data, error } = await supabase
     .from('colaborador')
     .select('id, empresa_id')
     .eq('auth_user_id', authData.user.id)
     .single();
-  if (error) throw new Error('Sua conta ainda não está vinculada a uma empresa no Tconnect.');
+  if (error) throw new Error('Não encontrei um colaborador ativo com o mesmo e-mail na empresa Tconnect.');
   return data;
 }
 

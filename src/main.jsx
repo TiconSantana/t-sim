@@ -36,7 +36,7 @@ import { costAssumptions, operationalCosts, operationalSource, operationsDefault
 import { calculateSimulation } from './domain/simulation';
 import { calculateCoverage, calculateDimensionCoverage, validateScenarioForApproval } from './domain/operations';
 import { loadApprovals, loadConfiguration, loadOperations, loadSavedScenarios, normalizeOperations, saveApproval, saveConfiguration, saveOperations, saveScenario } from './storage/scenarios';
-import { addCloudMember, cloudConfig, createCloudWorkspace, getCloudSession, listCloudMembers, listCloudWorkspaces, revokeCloudMember, signInCloud, signOutCloud, signUpCloud, supabase, updateCloudWorkspace } from './integrations/supabase';
+import { addCloudMember, cloudConfig, createCloudWorkspace, getCloudSession, linkCloudCollaborator, listCloudMembers, listCloudWorkspaces, revokeCloudMember, signInCloud, signOutCloud, signUpCloud, supabase, updateCloudWorkspace } from './integrations/supabase';
 import './styles.css';
 
 const navItems = [
@@ -518,10 +518,11 @@ function App() {
   useEffect(() => {
     if (!supabase) return undefined;
     let active = true;
-    getCloudSession().then((session) => { if (active) setCloudSession(session); }).catch(() => {});
+    getCloudSession().then(async (session) => { if (session) await linkCloudCollaborator(); if (active) setCloudSession(session); }).catch(() => {});
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setCloudSession(session);
       if (!session) { setCloudWorkspace(null); setCloudMembers([]); }
+      if (session) void linkCloudCollaborator().catch(() => {});
     });
     return () => { active = false; subscription.unsubscribe(); };
   }, []);
@@ -588,6 +589,7 @@ function App() {
 
   async function handleCloudAuth({ email, password, signUp }) {
     const session = signUp ? await signUpCloud(email, password) : await signInCloud(email, password);
+    if (session) await linkCloudCollaborator();
     setCloudSession(session);
     return session;
   }
