@@ -10,6 +10,8 @@ motor de cálculo e a separação entre domínio e interface.
 
 ## Sequência de entrega
 
+**Status atual:** Fases 1–4 implementadas em versão de trabalho; entrada de primeira visita integrada; Fase 5 em validação visual e técnica.
+
 ### Fase 1 — Sistema de marca e ícones
 
 - Consolidar logo principal, símbolo, versões para fundo claro e fundo escuro.

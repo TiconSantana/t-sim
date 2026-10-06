@@ -30,6 +30,8 @@ html { background: var(--paper); }
 body { margin: 0; font-family: 'DM Sans', Arial, sans-serif; color: var(--ink-950); background: var(--paper); }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
+.skip-link { position: fixed; z-index: 100; top: 10px; left: 12px; transform: translateY(-180%); padding: 10px 14px; border-radius: 9px; background: var(--ink-950); color: #fff; font-size: 12px; font-weight: 700; box-shadow: 0 10px 25px rgba(0, 0, 0, .18); transition: transform .16s ease; }
+.skip-link:focus { transform: translateY(0); }
 
 .app-shell { min-height: 100vh; display: flex; background: var(--paper); }
 .sidebar { width: 248px; flex: 0 0 248px; min-height: 100vh; background: var(--ink-950); color: #dce8f1; display: flex; flex-direction: column; padding: 23px 15px 16px; position: relative; z-index: 10; }
@@ -77,6 +79,7 @@ button { cursor: pointer; }
 .help-button:hover, .icon-button:hover { color: var(--blue); }
 .menu-trigger { display: none; }
 .content-wrap { max-width: 1410px; padding: 38px 40px 24px; margin: 0 auto; }
+.content-wrap:focus { outline: none; }
 
 .hero-intro { display: flex; justify-content: space-between; align-items: flex-end; gap: 30px; margin-bottom: 31px; }
 .eyebrow { display: flex; align-items: center; gap: 9px; color: var(--orange); font-size: 10px; letter-spacing: .13em; font-weight: 700; }

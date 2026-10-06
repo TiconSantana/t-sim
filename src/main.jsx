@@ -506,7 +506,9 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <>
+      <a className="skip-link" href="#workspace-content">Pular para o conteúdo</a>
+      <div className="app-shell">
       <aside className={`sidebar ${mobileNav ? 'mobile-open' : ''}`}>
         <div className="brand-block">
           <img className="brand-lockup" src="/brand/t-sim-logo-header.png" alt="T-SIM — Decisão inteligente" />
@@ -522,7 +524,7 @@ function App() {
         <nav className="primary-nav" aria-label="Navegação principal">
           <p className="nav-label">Navegação</p>
           {navItems.map(({ id, label, icon: Icon }) => (
-            <button key={label} className={`nav-item ${activeView === id ? 'active' : ''}`} onClick={() => { setActiveView(id); setMobileNav(false); }}>
+            <button key={label} className={`nav-item ${activeView === id ? 'active' : ''}`} aria-current={activeView === id ? 'page' : undefined} onClick={() => { setActiveView(id); setMobileNav(false); }}>
               <Icon size={17} strokeWidth={activeView === id ? 2.1 : 1.8} aria-hidden="true" />
               <span>{label}</span>
               {activeView === id && <span className="nav-pip" />}
@@ -545,7 +547,7 @@ function App() {
           <div className="topbar-actions"><span className="last-sync">Dados neste navegador <strong>salvamento local</strong></span><button className="theme-toggle" type="button" role="switch" aria-checked={theme === 'dark'} aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'} title={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'} onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}<span>{theme === 'dark' ? 'Claro' : 'Escuro'}</span></button><button className="help-button" aria-label="Ajuda"><CircleHelp size={18} /></button></div>
         </header>
 
-        <div className="content-wrap">
+        <div className="content-wrap" id="workspace-content" tabIndex="-1">
           {activeView === 'people' ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} onSaveConfiguration={handleSaveConfiguration} onResetConfiguration={handleResetConfiguration} saved={Boolean(window.localStorage.getItem('tsim.configuration.v1'))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} /> : activeView === 'presentation' ? <InstitutionalView onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'ops' ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' ? <AnalyticsView savedScenarios={savedScenarios} /> : activeView === 'ai' ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' ? <SettingsView configuration={configuration} operations={operations} savedScenarios={savedScenarios} approvals={approvals} onResetConfiguration={handleResetConfiguration} onClearWorkspace={handleClearWorkspace} onRestoreWorkspace={handleRestoreWorkspace} /> : <>
           <section className="hero-intro">
             <div>
@@ -572,7 +574,7 @@ function App() {
             <div className="simulator-panel panel-surface">
               <div className="panel-heading">
                 <div><span className="section-index">01</span><div><h2>Monte sua movimentação</h2><p>Defina a origem, o destino e a quantidade. O resultado se recalcula a cada escolha.</p></div></div>
-                <div className="panel-heading-actions">{saveMessage && <span className="save-message">{saveMessage}</span>}<button className="save-scenario-button" onClick={handleSaveScenario}><ClipboardCheck size={14} /> Salvar cenário</button><span className="live-badge"><span /> Recalcula ao alterar</span></div>
+                <div className="panel-heading-actions">{saveMessage && <span className="save-message" aria-live="polite">{saveMessage}</span>}<button className="save-scenario-button" onClick={handleSaveScenario}><ClipboardCheck size={14} /> Salvar cenário</button><span className="live-badge"><span /> Recalcula ao alterar</span></div>
               </div>
 
               {savedScenarios.length > 0 && <div className="saved-scenarios-strip"><span className="saved-label"><BookOpen size={13} /> {savedScenarios.length} cenário{savedScenarios.length === 1 ? '' : 's'} salvo{savedScenarios.length === 1 ? '' : 's'}</span><div className="saved-scenario-list">{savedScenarios.slice(0, 3).map((scenario) => <button key={scenario.id} className="saved-scenario-chip" onClick={() => restoreScenario(scenario)} title={`Reabrir ${scenario.name}`}><span>{scenario.name}</span><small>{new Date(scenario.savedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</small></button>)}</div></div>}
@@ -646,7 +648,8 @@ function App() {
       </main>
 
       {showAssumptions && <div className="modal-backdrop" role="presentation" onClick={() => setShowAssumptions(false)}><section className="assumptions-modal" role="dialog" aria-modal="true" aria-labelledby="assumptions-title" onClick={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">TRILHA DE PREMISSAS</span><h2 id="assumptions-title">Como este resultado foi calculado</h2></div><button className="icon-button" onClick={() => setShowAssumptions(false)} aria-label="Fechar"><X size={18} /></button></div><div className="assumption-grid"><div><span>Encargos</span><strong>{formatPercent(configuredEncargos)}</strong><small>Informado · RH / Controladoria</small></div><div><span>Horizonte</span><strong>12 meses</strong><small>Informado · período anualizado</small></div><div><span>ROI de retenção</span><strong>3 salários</strong><small>Estimado · custo de substituição</small></div><div><span>Saldo calculado</span><strong>{money(calc.appliedBalance)}</strong><small>Calculado · cenário atual aplicado</small></div></div><div className="formula-box"><span>Fórmula principal</span><code>saldo = (custo cargo desligado × quantidade) − (delta promoção × promoções)</code></div><div className="modal-note"><ClipboardCheck size={17} /><span>O resultado é indicativo até que a cobertura operacional, a elegibilidade e a aprovação orçamentária sejam confirmadas.</span></div><button className="primary-button" onClick={() => setShowAssumptions(false)}>Entendi</button></section></div>}
-    </div>
+      </div>
+    </>
   );
 }
 
