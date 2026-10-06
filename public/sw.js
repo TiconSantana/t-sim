@@ -1,4 +1,4 @@
-const CACHE_NAME = 't-sim-shell-v1';
+const CACHE_NAME = 't-sim-shell-v2';
 const APP_SHELL = [
   '/',
   '/index.html',
