@@ -323,10 +323,13 @@ Ops e Pareceres:
 - Analytics apresenta os custos de Campo, Sala Técnica e classes de equipe extraídos da fonte operacional.
 - Analytics e Ops usam 672 HC da aba Custos Equipes como base operacional oficial. Os 609 HC do Controle Local permanecem visíveis apenas como referência comparativa, sem soma automática.
 - Ops permite dimensionar linhas por região, turno e atividade, com capacidade por HC, cobertura projetada, fonte, vigência e bloqueio explícito quando o rateio necessário não foi informado.
+- O movimento do cenário pode ser distribuído automaticamente pelo HC de cada dimensão com arredondamento equilibrado, ou alocado manualmente por região/turno/atividade; divergência entre posições simuladas e alocadas bloqueia aprovação.
+- A importação operacional preserva linhas com headcount mas alocação incompleta para correção em tela e informa linhas sem valores de HC que foram ignoradas. A planilha pode fornecer a coluna opcional `Movimento alocado` para iniciar no modo manual.
 - T-Sim AI apresenta um parecer local baseado em regras, perguntas de validação e classificação explícita como estimativa.
 - Pareceres oferece impressão/PDF pelo navegador, além de JSON e Excel; Configurações oferece backup e restauração do workspace em JSON.
 - Configurações permite recuperar a grade e limpar os dados locais do ambiente demonstrativo.
 - Configurações permite criar perfis locais separados no mesmo navegador, alternar a base ativa e transportar dados por planilha ou backup JSON sem conta externa.
+- Perfis locais organizam dados apenas dentro do navegador: não são credenciais nem barreiras de acesso e não oferecem sincronização entre aparelhos.
 - O shell web inclui manifesto PWA, ícone instalável, service worker com fallback offline e configuração de rewrite para hospedagem estática.
 - O deploy público está conectado ao GitHub `TiconSantana/t-sim` e à Vercel `t-sim`.
 - O navegador guarda o workspace em `localStorage` e a tela Configurações permite exportar ou restaurar um backup JSON.

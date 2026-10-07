@@ -9,7 +9,7 @@ O T-Sim está publicado em [https://t-sim.vercel.app](https://t-sim.vercel.app) 
 - **Vercel:** hospedagem gratuita da aplicação estática.
 - **GitHub:** repositório oficial em `TiconSantana/t-sim`.
 - **Persistência local:** cenários, premissas, operações, pessoas e aprovações ficam no `localStorage` do navegador atual.
-- **Perfis locais:** Configurações permite criar e alternar bases isoladas no mesmo navegador, sem login e sem compartilhamento entre usuários.
+- **Perfis locais:** Configurações permite organizar e alternar bases no mesmo navegador, sem login ou compartilhamento externo. Eles não são contas nem uma barreira de acesso para pessoas que usam o mesmo navegador.
 - **Backup manual:** a tela Configurações exporta e restaura um arquivo JSON.
 - **Modo local sem login:** o produto abre direto no simulador e continua funcional sem conta ou conexão externa.
 - **Base própria por usuário:** os dados importados e calculados ficam isolados no navegador do usuário atual.

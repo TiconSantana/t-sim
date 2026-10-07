@@ -56,3 +56,24 @@ test('bloqueia cobertura abaixo do SLA alvo', () => {
   assert.equal(result.approvalBlocked, true);
   assert.equal(result.risk, 'Alto');
 });
+
+test('distribui movimentos inteiros proporcionalmente sem concentrar arredondamento na última dimensão', () => {
+  const result = calculateDimensionCoverage([
+    { id: 'a', region: 'BA', shift: 'Dia', activity: 'Instalação', currentHeadcount: 10, requiredHeadcount: 8, capacityPerPerson: 1, slaTarget: 90, source: 'Ops', validity: '2026' },
+    { id: 'b', region: 'PE', shift: 'Noite', activity: 'Manutenção', currentHeadcount: 10, requiredHeadcount: 8, capacityPerPerson: 1, slaTarget: 90, source: 'Ops', validity: '2026' },
+  ], 1);
+  assert.deepEqual(result.rows.map((row) => row.rowMovement), [1, 0]);
+  assert.equal(result.allocatedMovement, 1);
+});
+
+test('bloqueia aprovação quando a distribuição manual não corresponde ao movimento simulado', () => {
+  const dimensions = [
+    { id: 'a', region: 'BA', shift: 'Dia', activity: 'Instalação', currentHeadcount: 10, requiredHeadcount: 8, capacityPerPerson: 1, slaTarget: 90, source: 'Ops', validity: '2026', scenarioMovement: 1 },
+    { id: 'b', region: 'PE', shift: 'Noite', activity: 'Manutenção', currentHeadcount: 10, requiredHeadcount: 8, capacityPerPerson: 1, slaTarget: 90, source: 'Ops', validity: '2026', scenarioMovement: 0 },
+  ];
+  assert.equal(calculateDimensionCoverage(dimensions, 2, 'manual').approvalBlocked, true);
+  dimensions[1].scenarioMovement = 1;
+  const result = calculateDimensionCoverage(dimensions, 2, 'manual');
+  assert.equal(result.approvalBlocked, false);
+  assert.equal(result.allocatedMovement, 2);
+});

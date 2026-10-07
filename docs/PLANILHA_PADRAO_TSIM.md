@@ -26,11 +26,12 @@ Arquivo para download: [`public/templates/tsim-planilha-padrao.xlsx`](../public/
 ## Regras de importação
 
 - A importação de cargos usa a primeira aba da planilha, identifica a coluna **Salário base** (ou **Remuneração**) e associa o cargo pelo texto da primeira coluna. A aba **Cargos** da planilha padrão já vem com o formato completo e seis linhas de referência.
-- A importação de dimensões procura a aba **Operação** e reconhece os cabeçalhos de região, turno, atividade, HC atual, HC requerido e capacidade por HC.
+- A importação de dimensões procura uma aba operacional e reconhece Região, Turno, Atividade, HC atual, HC requerido, Capacidade por HC, SLA, Margem de segurança, Fonte e Vigência. Linhas incompletas com headcount são preservadas para correção; linhas sem valores de HC são ignoradas e contabilizadas no retorno.
+- Para trazer um rateio manual do movimento simulado, inclua a coluna opcional **Movimento alocado** (ou **HC movimento**) na aba Operação. Na tela Operação, o usuário também pode editar manualmente a quantidade por dimensão; o total precisa corresponder à quantidade selecionada no simulador.
 - A importação completa também grava Pessoas, Premissas e Cenários no perfil local selecionado; os custos e bases de headcount operacionais importados passam a alimentar o módulo Analytics quando as colunas forem reconhecidas.
-- Linhas incompletas ficam visíveis como pendência; a cobertura pode ser calculada, mas uma aprovação deve permanecer bloqueada até que o rateio seja informado.
+- Linhas incompletas ficam visíveis como pendência; cobertura, fonte e vigência podem ser revisadas por dimensão, mas uma aprovação permanece bloqueada até que os campos obrigatórios e o rateio do movimento estejam consistentes.
 - Encargos, ROI, retenção, turnover, produtividade e payback permanecem classificados conforme a origem: informado, calculado ou estimado.
 
 ## Privacidade e armazenamento
 
-O T-Sim não envia o conteúdo para TConnect, Supabase ou outro sistema. O arquivo é processado no navegador e os resultados ficam no `localStorage` do ambiente atual. Para levar uma base a outro aparelho, exporte o backup JSON ou a planilha preenchida e faça a importação manual no novo navegador.
+O T-Sim não envia o conteúdo para TConnect, Supabase ou outro sistema. O arquivo é processado no navegador e os resultados ficam no `localStorage` do ambiente atual. Perfis locais organizam bases no mesmo navegador, mas não são contas nem barreiras de acesso. Para levar uma base a outro aparelho, exporte o backup JSON ou a planilha preenchida e faça a importação manual no novo navegador.

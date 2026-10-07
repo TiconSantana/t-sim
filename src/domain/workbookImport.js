@@ -142,7 +142,7 @@ export function parseOperationalWorkbook(sheets, currentOperations) {
       capacity: firstColumn(headers, 'capacidadeporhc', 'capacidade', 'producao'), sla: firstColumn(headers, 'sla', 'slaalvo'), safety: firstColumn(headers, 'margemseguranca', 'margemdeseguranca'),
       monthlyCost: firstColumn(headers, 'customensal', 'custototalmensal', 'custoequipe', 'custototal'), unitCost: firstColumn(headers, 'custoporhc', 'custounitario', 'custoporheadcount', 'valorunitario'),
       teamCount: firstColumn(headers, 'quantidadedeequipes', 'numeroequipes', 'equipes'), teamUnitCost: firstColumn(headers, 'custoporequipe', 'valorporequipe'),
-      source: firstColumn(headers, 'fonte', 'source', 'origem'), validity: firstColumn(headers, 'vigencia', 'validade', 'versao'),
+      movement: firstColumn(headers, 'movimentoalocado', 'hcmovimento', 'quantidademovimentada'), source: firstColumn(headers, 'fonte', 'source', 'origem'), validity: firstColumn(headers, 'vigencia', 'validade', 'versao'),
     };
     const source = text(cell(body.find((row) => text(cell(row, col.source))), col.source)) || sheetName;
     for (const [index, row] of body.entries()) {
@@ -152,11 +152,15 @@ export function parseOperationalWorkbook(sheets, currentOperations) {
       const rowSource = text(cell(row, col.source)) || source;
       const validity = text(cell(row, col.validity)) || 'A informar';
       if (col.region >= 0 && col.shift >= 0 && col.activity >= 0 && (current > 0 || required > 0)) {
+        const currentValue = number(cell(row, col.current));
+        const requiredValue = number(cell(row, col.required));
         dimensionRows.push({
           id: `imported-${Date.now()}-${dimensionRows.length}`, region: text(cell(row, col.region)), shift: text(cell(row, col.shift)), activity: text(cell(row, col.activity)), teamClass: label,
           currentHeadcount: current, requiredHeadcount: required, capacityPerPerson: number(cell(row, col.capacity)) ?? 1,
           slaTarget: number(cell(row, col.sla)) ?? currentOperations.slaTarget, safetyBuffer: number(cell(row, col.safety)) ?? currentOperations.safetyBuffer,
           source: rowSource, validity, classification: 'Informada', capacityClassification: col.capacity >= 0 ? 'Informada' : 'Estimada', allocationStatus: 'Importada · revisar antes de salvar',
+          scenarioMovement: number(cell(row, col.movement)) ?? 0,
+          missingFields: [currentValue === null && 'HC atual', requiredValue === null && 'HC requerido'].filter(Boolean),
         });
       }
       const monthlyCost = number(cell(row, col.monthlyCost));
@@ -176,8 +180,56 @@ export function parseOperationalWorkbook(sheets, currentOperations) {
     dimensions: dimensionRows,
     costs: allCosts,
     headcountBases: allHeadcountBases,
-    operations: dimensionRows.length ? { ...currentOperations, dimensions: dimensionRows, teamHeadcount: dimensionRows.reduce((sum, row) => sum + row.currentHeadcount, 0), requiredHeadcount: dimensionRows.reduce((sum, row) => sum + row.requiredHeadcount, 0), costs: allCosts, headcountBases: allHeadcountBases, basisSource: 'Importação local · planilha operacional' } : (allCosts.length || allHeadcountBases.length ? { ...currentOperations, costs: allCosts.length ? allCosts : currentOperations.costs ?? [], headcountBases: allHeadcountBases.length ? allHeadcountBases : currentOperations.headcountBases ?? [], basisSource: 'Importação local · planilha operacional' } : null),
+    operations: dimensionRows.length ? { ...currentOperations, dimensions: dimensionRows, allocationMode: dimensionRows.some((row) => row.scenarioMovement > 0) ? 'manual' : 'auto', teamHeadcount: dimensionRows.reduce((sum, row) => sum + row.currentHeadcount, 0), requiredHeadcount: dimensionRows.reduce((sum, row) => sum + row.requiredHeadcount, 0), costs: allCosts, headcountBases: allHeadcountBases, basisSource: 'Importação local · planilha operacional' } : (allCosts.length || allHeadcountBases.length ? { ...currentOperations, costs: allCosts.length ? allCosts : currentOperations.costs ?? [], headcountBases: allHeadcountBases.length ? allHeadcountBases : currentOperations.headcountBases ?? [], basisSource: 'Importação local · planilha operacional' } : null),
   };
+}
+
+export function parseDimensionSheet(rows, { sheetName = 'Operação', fileName = 'Planilha importada', slaTarget = 95, safetyBuffer = 0 } = {}) {
+  const aliases = {
+    region: ['regiao', 'regional', 'uf'], shift: ['turno', 'jornada'], activity: ['atividade', 'funcao', 'operacao'],
+    teamClass: ['classe', 'classeequipe', 'equipe', 'tipodeequipe'], current: ['hcatual', 'headcountatual', 'atual', 'hc', 'quantidadehc'],
+    required: ['hcrequerido', 'headcountrequerido', 'requerido', 'necessario'], capacity: ['capacidadeporhc', 'capacidade', 'producao'],
+    movement: ['movimentoalocado', 'hcmovimento', 'quantidademovimentada'], sla: ['sla', 'slaalvo'], safety: ['margemseguranca', 'margemdeseguranca'], source: ['fonte', 'source', 'origem'], validity: ['vigencia', 'validade', 'versao'],
+  };
+  const headerRowIndex = rows.findIndex((row) => {
+    const normalized = row.map(normalize);
+    return aliases.region.some((name) => normalized.includes(name)) && aliases.shift.some((name) => normalized.includes(name))
+      && aliases.activity.some((name) => normalized.includes(name)) && aliases.current.some((name) => normalized.includes(name))
+      && aliases.required.some((name) => normalized.includes(name));
+  });
+  if (headerRowIndex < 0) throw new Error('Colunas obrigatórias não encontradas: Região, Turno, Atividade, HC atual e HC requerido.');
+  const headers = rows[headerRowIndex].map(normalize);
+  const columns = Object.fromEntries(Object.entries(aliases).map(([key, names]) => [key, headers.findIndex((header) => names.includes(header))]));
+  const rowsWithData = rows.slice(headerRowIndex + 1).filter((row) => row.some((value) => text(value)));
+  const imported = [];
+  let skippedRows = 0;
+  let pendingRows = 0;
+  for (const [index, row] of rowsWithData.entries()) {
+    const current = number(cell(row, columns.current));
+    const required = number(cell(row, columns.required));
+    if (current === null && required === null) { skippedRows += 1; continue; }
+    const region = text(cell(row, columns.region));
+    const shift = text(cell(row, columns.shift));
+    const activity = text(cell(row, columns.activity));
+    const source = text(cell(row, columns.source)) || fileName;
+    const validity = text(cell(row, columns.validity)) || 'A informar';
+    const incomplete = !region || !shift || !activity || current === null || required === null;
+    if (incomplete) pendingRows += 1;
+    imported.push({
+      id: `dimension-import-${Date.now()}-${index}`, region, shift, activity,
+      teamClass: text(cell(row, columns.teamClass)) || 'A informar',
+      currentHeadcount: current ?? 0, requiredHeadcount: required ?? 0,
+      scenarioMovement: number(cell(row, columns.movement)) ?? 0,
+      capacityPerPerson: number(cell(row, columns.capacity)) ?? 1,
+      slaTarget: number(cell(row, columns.sla)) ?? slaTarget,
+      safetyBuffer: number(cell(row, columns.safety)) ?? safetyBuffer,
+      source, validity, classification: 'Informada',
+      capacityClassification: columns.capacity >= 0 ? 'Informada' : 'Estimada',
+      allocationStatus: incomplete ? 'Importada · dados pendentes' : 'Importada · revisar antes de salvar',
+      missingFields: [!region && 'região', !shift && 'turno', !activity && 'atividade', current === null && 'HC atual', required === null && 'HC requerido'].filter(Boolean),
+    });
+  }
+  return { rows: imported, skippedRows, pendingRows, sheetName, allocationMode: columns.movement >= 0 && imported.some((row) => row.scenarioMovement > 0) ? 'manual' : 'auto' };
 }
 
 function parseLegacyOperationalSheets(sheets) {

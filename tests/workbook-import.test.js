@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTsimWorkbook } from '../src/domain/workbookImport.js';
+import { parseDimensionSheet, parseTsimWorkbook } from '../src/domain/workbookImport.js';
 import { cargos } from '../src/data/cargos.js';
 
 test('importa a planilha padrão nas áreas do perfil local', () => {
@@ -53,4 +53,19 @@ test('reconhece headcount oficial e comparativo da planilha operacional legada',
   const result = parseTsimWorkbook(sheets, { configuration: { cargos, encargos: 1.13 }, operations: {} });
   assert.deepEqual(result.headcountBases.map((item) => item.headcount), [672, 609]);
   assert.ok(result.counts.costs >= 1);
+});
+
+test('preserva linhas operacionais incompletas para correção, sem descartá-las silenciosamente', () => {
+  const parsed = parseDimensionSheet([
+    ['Região', 'Turno', 'Atividade', 'HC atual', 'HC requerido', 'Capacidade por HC', 'Movimento alocado', 'Fonte', 'Vigência'],
+    ['BA', 'Diurno', 'Instalação', '1.234', '1.300', 1, 1, 'Operações', '2026'],
+    ['', 'Noturno', 'Manutenção', 8, 10, 1, 0, 'Operações', '2026'],
+    ['BA', 'Diurno', '', '', '', 1, '', 'Operações', '2026'],
+  ], { sheetName: 'Operação', fileName: 'rateio.xlsx' });
+  assert.equal(parsed.rows.length, 2);
+  assert.equal(parsed.pendingRows, 1);
+  assert.equal(parsed.skippedRows, 1);
+  assert.equal(parsed.rows[0].currentHeadcount, 1234);
+  assert.deepEqual(parsed.rows[1].missingFields, ['região']);
+  assert.equal(parsed.allocationMode, 'manual');
 });
