@@ -118,6 +118,49 @@ test('reconhece nomes alternativos de colunas e valores monetários nos padrões
   assert.equal(invalidNumbers.skippedRows, 1);
 });
 
+test('importa cadastro de cargos com cabeçalho Salário Base (R$) e linhas após título', () => {
+  const workbook = {
+    'Cadastro de Cargos': [
+      ['FERRAMENTA DE PLANEJAMENTO DE PROMOÇÕES'],
+      ['Cargo', 'Salário Base (R$)'],
+      ['Auxiliar de Fibra Óptica', 'R$ 1.850,50'],
+    ],
+  };
+  const result = parseTsimWorkbook(workbook, { configuration: { cargos, encargos: 1.13 }, operations: {} });
+  assert.equal(result.counts.cargos, 1);
+  assert.equal(result.configuration.cargos.find((cargo) => cargo.id === 'auxiliar').salary, 1850.5);
+});
+
+test('importa salários de origem e destino da tabela do simulador de promoções', () => {
+  const workbook = {
+    'Simulador Promoções': [
+      ['Cargo Origem', 'Salário Origem', 'Cargo Destino', 'Salário Destino', 'Diferença Salarial', 'Qtd. Promoções Possíveis'],
+      ['Auxiliar de Fibra Óptica', 1621, 'Técnico de Fibra Óptica II', 2017.19, 396.19, 4],
+      ['Auxiliar de Fibra Óptica', 1621, 'Técnico de Fibra Óptica N/3', 2410.94, 789.94, 3],
+      ['Auxiliar de Fibra Óptica', 1621, 'Técnico de Fibra Óptica N/4', 2634.7, 1013.7, 2],
+      ['Auxiliar de Fibra Óptica', 1621, 'Técnico de Fibra Óptica V', 3028.25, 1407.25, 1],
+      ['Auxiliar de Fibra Óptica', 1621, 'Técnico de Fibra Óptica VI', 3214.85, 1593.85, 1],
+    ],
+  };
+  const result = parseTsimWorkbook(workbook, { configuration: { cargos, encargos: 1.13 }, operations: {} });
+  assert.equal(result.counts.cargos, 6);
+  assert.deepEqual(result.configuration.cargos.map(({ id, salary }) => [id, salary]), cargos.map(({ id, salary }) => [id, salary]));
+  assert.ok(result.configuration.cargos.every((cargo) => cargo.source.includes('pares de salários importados')));
+});
+
+test('não escolhe silenciosamente salário divergente na tabela de promoções', () => {
+  const workbook = {
+    'Simulador Promoções': [
+      ['Cargo Origem', 'Salário Origem', 'Cargo Destino', 'Salário Destino'],
+      ['Auxiliar de Fibra Óptica', 1600, 'Técnico de Fibra Óptica II', 2017.19],
+      ['Auxiliar de Fibra Óptica', 1621, 'Técnico de Fibra Óptica N/3', 2410.94],
+    ],
+  };
+  const result = parseTsimWorkbook(workbook, { configuration: { cargos, encargos: 1.13 }, operations: {} });
+  assert.equal(result.configuration.cargos.find((cargo) => cargo.id === 'auxiliar').salary, 1621);
+  assert.deepEqual(result.warnings, ['Salários divergentes ignorados para: Auxiliar. Revise a planilha antes de importar esses cargos.']);
+});
+
 test('restaura abas de custo, headcount, cenário e histórico do backup Excel', () => {
   const workbook = {
     Cargos: [['Cargo', 'Salário base', 'Encargos (%)'], ['Auxiliar de Fibra Óptica', 1800, 113]],

@@ -1,4 +1,5 @@
 const normalize = (value) => String(value ?? '')
+  .replace(/r\$/gi, '')
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -52,7 +53,7 @@ const roleId = (label, cargos) => {
 
 export function parseCargoSheet(rows, cargos) {
   const parsed = table(rows, ['cargo', 'funcao', 'nomecargo', 'salariobase', 'salariomensal', 'salario', 'remuneracao', 'remuneracaoatual', 'valor', 'valorsalario']);
-  if (!parsed) return { cargos: null, encargos: null, count: 0 };
+  if (!parsed) return { cargos: null, encargos: null, count: 0, ids: [] };
   const { headers, body } = parsed;
   const nameCol = firstColumn(headers, 'cargo', 'funcao', 'nomecargo');
   const salaryCol = firstColumn(headers, 'salariobase', 'salariomensal', 'salarioatual', 'salario', 'remuneracao', 'remuneracaoatual', 'valor', 'valorsalario');
@@ -60,9 +61,10 @@ export function parseCargoSheet(rows, cargos) {
   const sourceCol = firstColumn(headers, 'fonte', 'origem', 'source');
   const validityCol = firstColumn(headers, 'vigencia', 'validade', 'versao');
   const ownerCol = firstColumn(headers, 'responsavel', 'proprietario');
-  if (nameCol < 0 || salaryCol < 0) return { cargos: null, encargos: null, count: 0 };
+  if (nameCol < 0 || salaryCol < 0) return { cargos: null, encargos: null, count: 0, ids: [] };
   const next = cargos.map((cargo) => ({ ...cargo }));
   let count = 0;
+  const importedIds = new Set();
   let burden = null;
   for (const row of body) {
     const name = text(cell(row, nameCol));
@@ -79,8 +81,54 @@ export function parseCargoSheet(rows, cargos) {
     const rowBurden = number(cell(row, burdenCol));
     if (rowBurden !== null && rowBurden >= 0) burden = rowBurden > 10 ? rowBurden / 100 : rowBurden;
     count += 1;
+    importedIds.add(id);
   }
-  return { cargos: count ? next : null, encargos: burden, count };
+  return { cargos: count ? next : null, encargos: burden, count, ids: [...importedIds] };
+}
+
+function parseCargoSalaryPairs(sheets, cargos) {
+  const salaryCandidates = new Map();
+  for (const [sheetName, rows] of Object.entries(sheets)) {
+    const parsed = table(rows, ['cargoorigem', 'cargodestino']);
+    if (!parsed) continue;
+    const { headers, body } = parsed;
+    const pairs = [
+      [firstColumn(headers, 'cargoorigem'), firstColumn(headers, 'salarioorigem', 'salariobaseorigem')],
+      [firstColumn(headers, 'cargodestino'), firstColumn(headers, 'salariodestino', 'salariobasedestino')],
+    ];
+    if (!pairs.some(([roleCol, salaryCol]) => roleCol >= 0 && salaryCol >= 0)) continue;
+    for (const row of body) {
+      for (const [roleCol, salaryCol] of pairs) {
+        if (roleCol < 0 || salaryCol < 0) continue;
+        const id = roleId(cell(row, roleCol), cargos);
+        const salary = number(cell(row, salaryCol));
+        if (!id || salary === null || salary <= 0) continue;
+        if (!salaryCandidates.has(id)) salaryCandidates.set(id, new Map());
+        const values = salaryCandidates.get(id);
+        const key = salary.toFixed(2);
+        values.set(key, { salary, source: sheetName });
+      }
+    }
+  }
+
+  const next = cargos.map((cargo) => ({ ...cargo }));
+  const updatedIds = new Set();
+  const ambiguousIds = [];
+  for (const [id, candidates] of salaryCandidates) {
+    // Salary pairs can repeat a role across many alternatives. Apply only a
+    // single unambiguous value; conflicting workbook values need human review.
+    if (candidates.size !== 1) { ambiguousIds.push(id); continue; }
+    const candidate = [...candidates.values()][0];
+    const index = next.findIndex((cargo) => cargo.id === id);
+    if (index < 0) continue;
+    next[index] = {
+      ...next[index], salary: candidate.salary,
+      source: `${candidate.source} · pares de salários importados`,
+      validity: 'Vigência a confirmar',
+    };
+    updatedIds.add(id);
+  }
+  return { cargos: updatedIds.size ? next : null, count: updatedIds.size, ids: [...updatedIds], ambiguousIds };
 }
 
 export function parsePeopleSheet(rows) {
@@ -384,12 +432,18 @@ export function parseApprovalHistorySheet(rows) {
 
 export function parseTsimWorkbook(sheets, { configuration, operations }) {
   const find = (name) => Object.entries(sheets).find(([sheetName]) => normalize(sheetName) === normalize(name))?.[1];
-  const cargoResult = parseCargoSheet(find('Cargos') ?? Object.values(sheets)[0] ?? [], configuration.cargos);
+  const cargoResult = parseCargoSheet(find('Cargos') ?? find('Cadastro de Cargos') ?? find('Estrutura de Cargos') ?? Object.values(sheets)[0] ?? [], configuration.cargos);
+  const pairResult = parseCargoSalaryPairs(sheets, cargoResult.cargos ?? configuration.cargos);
+  const mergedCargos = pairResult.cargos ?? cargoResult.cargos;
+  const cargoIds = new Set([...cargoResult.ids, ...pairResult.ids]);
+  const warnings = pairResult.ambiguousIds.length
+    ? [`Salários divergentes ignorados para: ${pairResult.ambiguousIds.map((id) => configuration.cargos.find((cargo) => cargo.id === id)?.short ?? id).join(', ')}. Revise a planilha antes de importar esses cargos.`]
+    : [];
   const people = parsePeopleSheet(find('Pessoas') ?? []);
   const assumptions = parseAssumptionsSheet(find('Premissas') ?? []);
   const operational = parseOperationalWorkbook(sheets, operations);
-  const assumed = applyAssumptions({ assumptions, configuration: { ...configuration, cargos: cargoResult.cargos ?? configuration.cargos, encargos: cargoResult.encargos ?? configuration.encargos }, operations: operational.operations ?? operations });
+  const assumed = applyAssumptions({ assumptions, configuration: { ...configuration, cargos: mergedCargos ?? configuration.cargos, encargos: cargoResult.encargos ?? configuration.encargos }, operations: operational.operations ?? operations });
   const scenarios = parseScenarioSheet(find('Cenários') ?? [], assumed.configuration.cargos);
   const auditHistory = parseApprovalHistorySheet(find('Histórico') ?? find('Historico') ?? []);
-  return { configuration: assumed.configuration, operations: assumed.operations, people, assumptions, scenarios, auditHistory, costs: operational.costs, headcountBases: operational.headcountBases, counts: { cargos: cargoResult.count, people: people.length, assumptions: assumptions.length, dimensions: operational.dimensions.length, costs: operational.costs.length, scenarios: scenarios.length, auditEvents: auditHistory.length } };
+  return { configuration: assumed.configuration, operations: assumed.operations, people, assumptions, scenarios, auditHistory, costs: operational.costs, headcountBases: operational.headcountBases, warnings, counts: { cargos: cargoIds.size, people: people.length, assumptions: assumptions.length, dimensions: operational.dimensions.length, costs: operational.costs.length, scenarios: scenarios.length, auditEvents: auditHistory.length } };
 }

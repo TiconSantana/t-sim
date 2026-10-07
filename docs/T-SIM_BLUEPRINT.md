@@ -343,14 +343,15 @@ O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O mod
 
 **Atualizado:** 07/10/2026
 
-- A suíte `pnpm test` contém 18 verificações e passou integralmente neste ciclo. Inclui limites financeiros, promoção manual acima do automático, elegibilidade, cobertura, importações Excel e restauração do histórico.
+- A suíte `pnpm test` contém 21 verificações e passou integralmente neste ciclo. Inclui limites financeiros, promoção manual acima do automático, elegibilidade, cobertura, importações Excel e restauração do histórico.
 - O importador `.xlsx` reconhece nomes alternativos comuns para cargos, região, período/turno, atividade, headcount e capacidade; também interpreta valores textuais em formatos numéricos brasileiros e norte-americanos.
+- Os formatos de cargos dos anexos `Ferramenta_Planejamento_Promocoes` (Cadastro de Cargos com coluna `Salário Base (R$)`) e `Simulador_Promocoes_Tecnicos` (pares Cargo/Salário de origem e destino) agora são reconhecidos. Divergências de salário para o mesmo cargo são ignoradas e reportadas na mensagem da importação para revisão humana.
 - O backup Excel cobre Cargos, Pessoas, Premissas, Operação, Custos, Headcount, Cenários e Histórico. A importação continua restrita ao formato `.xlsx`.
-- No build de produção, o JavaScript inicial ficou em 360,22 KB (104,45 KB gzip). A biblioteca Excel é emitida como chunk separado de 423,91 KB (141,25 KB gzip) e é importada sob demanda em operações de arquivo; não é parte do carregamento inicial.
+- No build de produção, o JavaScript inicial ficou em 361,53 KB (104,95 KB gzip). A biblioteca Excel é emitida como chunk separado de 423,91 KB (141,25 KB gzip) e é importada sob demanda em operações de arquivo; não é parte do carregamento inicial.
 - Os avisos de build sobre `use client` vêm de `lucide-react` e não impedem a compilação.
 
 ### Itens deliberadamente fora desta entrega
 
 A autenticação, permissões por usuário e auditoria persistente em servidor continuam fora do modo local atualmente escolhido. Os dados permanecem no navegador e a transferência entre aparelhos é manual por arquivo Excel. Para habilitar sincronização real entre dispositivos, será necessário reabrir o escopo de backend próprio do T-Sim; essa decisão não será substituída por uma dependência do TConnect.
 
-O importador segue preparado para planilhas `.xlsx` com os aliases listados, além das fontes operacionais atualmente reconhecidas. Estruturas novas e específicas de outras empresas ainda precisam ser mapeadas a partir de uma planilha de exemplo.
+O importador segue preparado para planilhas `.xlsx` com os aliases listados, incluindo as estruturas de cargos e salários de promoção presentes nos anexos do projeto, além das fontes operacionais atualmente reconhecidas. Estruturas novas e específicas de outras empresas ainda precisam ser mapeadas a partir de uma planilha de exemplo.
