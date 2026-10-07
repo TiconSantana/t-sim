@@ -310,7 +310,7 @@ html[data-theme="dark"] .profile-switcher select, html[data-theme="dark"] .profi
 @media (max-width: 1120px) { .ai-grid { grid-template-columns: 1fr; } }
 @media (max-width: 780px) { .ai-panel { padding: 20px 16px 16px; } }
 .settings-backup { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 9px; }
-.settings-backup .secondary-button { width: 100%; text-align: left; }
+.settings-backup .secondary-button { width: 100%; text-align: left; }.settings-backup > span { align-self: center; color: var(--ink-500); font-size: 9px; line-height: 1.45; }
 .print-brand { display: none; }
 @keyframes pulse { 0%, 100% { opacity: .45; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.1); } }
 @media print {

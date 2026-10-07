@@ -10,7 +10,7 @@ O T-Sim está publicado em [https://t-sim.vercel.app](https://t-sim.vercel.app) 
 - **GitHub:** repositório oficial em `TiconSantana/t-sim`.
 - **Persistência local:** cenários, premissas, operações, pessoas e aprovações ficam no `localStorage` do navegador atual.
 - **Perfis locais:** Configurações permite organizar e alternar bases no mesmo navegador, sem login ou compartilhamento externo. Eles não são contas nem uma barreira de acesso para pessoas que usam o mesmo navegador.
-- **Backup manual:** a tela Configurações exporta e restaura um arquivo JSON.
+- **Backup manual:** a tela Configurações exporta e importa o backup completo em Excel `.xlsx`.
 - **Modo local sem login:** o produto abre direto no simulador e continua funcional sem conta ou conexão externa.
 - **Base própria por usuário:** os dados importados e calculados ficam isolados no navegador do usuário atual.
 - **Planilha padrão:** o arquivo `.xlsx` pode ser baixado em Configurações, preenchido pelo usuário e importado pela opção **Importar planilha completa**. As abas Cargos, Pessoas, Premissas, Operação e Cenários são lidas localmente; a importação também reconhece a estrutura operacional da planilha de custos V.TAL.
@@ -22,4 +22,4 @@ Cada atualização enviada para a branch `main` gera um novo deploy automático 
 
 ## Limite atual
 
-O deploy público disponibiliza a aplicação em qualquer aparelho conectado, mas cada navegador mantém sua própria base local. Para levar dados a outro aparelho, exporte o backup JSON ou a planilha preenchida e importe no novo ambiente. Uma base online própria do T-Sim pode ser adicionada futuramente como uma evolução separada.
+O deploy público disponibiliza a aplicação em qualquer aparelho conectado, mas cada navegador mantém sua própria base local. Para levar dados a outro aparelho, exporte o backup Excel `.xlsx` ou a planilha preenchida e importe no novo ambiente. Uma base online própria do T-Sim pode ser adicionada futuramente como uma evolução separada.

@@ -141,7 +141,7 @@ export function parseOperationalWorkbook(sheets, currentOperations) {
     const { headers, body } = parsed;
     const col = {
       region: firstColumn(headers, 'regiao', 'regional', 'uf'), shift: firstColumn(headers, 'turno', 'jornada'),
-      activity: firstColumn(headers, 'atividade', 'funcao', 'operacao'), teamClass: firstColumn(headers, 'classe', 'classeequipe', 'equipe', 'tipodeequipe'),
+      activity: firstColumn(headers, 'atividade', 'funcao', 'operacao'), teamClass: firstColumn(headers, 'classe', 'classeequipe', 'classedeequipe', 'equipe', 'tipodeequipe'),
       current: firstColumn(headers, 'hcatual', 'headcountatual', 'headcount', 'hc', 'quantidadehc'), required: firstColumn(headers, 'hcrequerido', 'headcountrequerido', 'requerido', 'necessario'),
       capacity: firstColumn(headers, 'capacidadeporhc', 'capacidade', 'producao'), sla: firstColumn(headers, 'sla', 'slaalvo'), safety: firstColumn(headers, 'margemseguranca', 'margemdeseguranca'),
       monthlyCost: firstColumn(headers, 'customensal', 'custototalmensal', 'custoequipe', 'custototal'), unitCost: firstColumn(headers, 'custoporhc', 'custounitario', 'custoporheadcount', 'valorunitario'),
@@ -191,7 +191,7 @@ export function parseOperationalWorkbook(sheets, currentOperations) {
 export function parseDimensionSheet(rows, { sheetName = 'Operação', fileName = 'Planilha importada', slaTarget = 95, safetyBuffer = 0 } = {}) {
   const aliases = {
     region: ['regiao', 'regional', 'uf'], shift: ['turno', 'jornada'], activity: ['atividade', 'funcao', 'operacao'],
-    teamClass: ['classe', 'classeequipe', 'equipe', 'tipodeequipe'], current: ['hcatual', 'headcountatual', 'atual', 'hc', 'quantidadehc'],
+    teamClass: ['classe', 'classeequipe', 'classedeequipe', 'equipe', 'tipodeequipe'], current: ['hcatual', 'headcountatual', 'atual', 'hc', 'quantidadehc'],
     required: ['hcrequerido', 'headcountrequerido', 'requerido', 'necessario'], capacity: ['capacidadeporhc', 'capacidade', 'producao'],
     movement: ['movimentoalocado', 'hcmovimento', 'quantidademovimentada'], sla: ['sla', 'slaalvo'], safety: ['margemseguranca', 'margemdeseguranca'], source: ['fonte', 'source', 'origem'], validity: ['vigencia', 'validade', 'versao'],
   };
@@ -299,11 +299,15 @@ export function parseScenarioSheet(rows, cargos) {
   if (!parsed) return [];
   const { headers, body } = parsed;
   const col = {
+    id: firstColumn(headers, 'id', 'identificador'),
     name: firstColumn(headers, 'nomedocenario', 'cenario', 'nome'), date: firstColumn(headers, 'data', 'datacriacao'),
     dismissedRole: firstColumn(headers, 'cargodesligado', 'origemdesligamento'), quantity: firstColumn(headers, 'quantidadedesligada', 'quantidade'),
     originRole: firstColumn(headers, 'cargoorigem', 'origemdapromocao'), destinationRole: firstColumn(headers, 'cargodestino', 'destinodapromocao'),
     automatic: firstColumn(headers, 'promocoesautomaticas', 'automaticas'), manual: firstColumn(headers, 'promocoesmanuais', 'manuais'),
-    balance: firstColumn(headers, 'saldomensal', 'saldo'), status: firstColumn(headers, 'status', 'situacao'), notes: firstColumn(headers, 'observacao', 'notas'),
+    balance: firstColumn(headers, 'saldomensal', 'saldo'), annualBalance: firstColumn(headers, 'saldoanual'),
+    delta: firstColumn(headers, 'deltaporpromocao'), coverage: firstColumn(headers, 'coberturaoperacional'),
+    encargos: firstColumn(headers, 'encargos'), scenario: firstColumn(headers, 'tipocenario', 'recomendacao'),
+    source: firstColumn(headers, 'fonte'), status: firstColumn(headers, 'status', 'situacao'), notes: firstColumn(headers, 'observacao', 'notas'),
   };
   if (col.name < 0) return [];
   return body.map((row, index) => {
@@ -314,14 +318,52 @@ export function parseScenarioSheet(rows, cargos) {
     const manualValue = number(cell(row, col.manual));
     const statusText = normalize(cell(row, col.status));
     return {
-      id: `imported-scenario-${Date.now()}-${index}`, name: text(cell(row, col.name)) || `Cenário importado ${index + 1}`,
+      id: text(cell(row, col.id)) || `imported-scenario-${Date.now()}-${index}`, name: text(cell(row, col.name)) || `Cenário importado ${index + 1}`,
       savedAt: text(cell(row, col.date)) || new Date().toISOString(), dismissedRole: dismissed || cargos[0]?.id, quantity: number(cell(row, col.quantity)) ?? 1,
       originRole: origin || cargos[1]?.id, destinationRole: destination || cargos[2]?.id, activeScenario: 'balanced', manualMode: manualValue !== null,
       manualPromotions: manualValue, automaticPromotions, appliedPromotions: manualValue ?? automaticPromotions,
-      appliedBalance: number(cell(row, col.balance)) ?? 0, appliedAnnualBalance: (number(cell(row, col.balance)) ?? 0) * 12,
-      source: 'Importado da planilha', importedNotes: text(cell(row, col.notes)), importedStatus: statusText,
+      appliedBalance: number(cell(row, col.balance)) ?? 0, appliedAnnualBalance: number(cell(row, col.annualBalance)) ?? (number(cell(row, col.balance)) ?? 0) * 12,
+      delta: number(cell(row, col.delta)) ?? 0, operationalCoverage: number(cell(row, col.coverage)),
+      encargos: number(cell(row, col.encargos)), activeScenario: text(cell(row, col.scenario)) || 'balanced',
+      source: text(cell(row, col.source)) || 'Importado da planilha', importedNotes: text(cell(row, col.notes)), importedStatus: statusText,
     };
   }).filter((scenario) => scenario.name);
+}
+
+export function parseApprovalHistorySheet(rows) {
+  const parsed = table(rows, ['idevento', 'statusanterior', 'statusnovo']);
+  if (!parsed) return [];
+  const { headers, body } = parsed;
+  const col = {
+    id: firstColumn(headers, 'idevento', 'iddoevento', 'id'), scenarioId: firstColumn(headers, 'idcenario', 'iddocenario', 'cenarioid'),
+    scenarioName: firstColumn(headers, 'cenario', 'nomedocenario'), previousStatus: firstColumn(headers, 'statusanterior'),
+    nextStatus: firstColumn(headers, 'statusnovo', 'status'), recordedAt: firstColumn(headers, 'registradoem', 'data'),
+    profile: firstColumn(headers, 'perfil'), source: firstColumn(headers, 'fonte'), quantity: firstColumn(headers, 'quantidade', 'posicoes'),
+    automatic: firstColumn(headers, 'promocoesautomaticas'), appliedPromotions: firstColumn(headers, 'promocoesaplicadas'),
+    balance: firstColumn(headers, 'saldomensal'), annualBalance: firstColumn(headers, 'saldoanual'),
+    coverage: firstColumn(headers, 'coberturaoperacional'), encargos: firstColumn(headers, 'encargos'),
+    delta: firstColumn(headers, 'deltaporpromocao'),
+  };
+  if (col.scenarioId < 0 || col.nextStatus < 0) return [];
+  return body.map((row, index) => {
+    const scenarioId = text(cell(row, col.scenarioId));
+    const status = text(cell(row, col.nextStatus));
+    if (!scenarioId || !status) return null;
+    return {
+      id: text(cell(row, col.id)) || `imported-audit-${Date.now()}-${index}`,
+      type: 'approval-status-change',
+      scenarioId, scenarioName: text(cell(row, col.scenarioName)) || 'Cenário importado',
+      previousStatus: text(cell(row, col.previousStatus)) || 'Rascunho', nextStatus: status,
+      recordedAt: text(cell(row, col.recordedAt)) || new Date().toISOString(), profileId: text(cell(row, col.profile)),
+      source: text(cell(row, col.source)), scenarioSnapshot: {
+        id: scenarioId, name: text(cell(row, col.scenarioName)), source: text(cell(row, col.source)),
+        quantity: number(cell(row, col.quantity)), automaticPromotions: number(cell(row, col.automatic)),
+        appliedPromotions: number(cell(row, col.appliedPromotions)), appliedBalance: number(cell(row, col.balance)),
+        appliedAnnualBalance: number(cell(row, col.annualBalance)), operationalCoverage: number(cell(row, col.coverage)),
+        encargos: number(cell(row, col.encargos)), delta: number(cell(row, col.delta)),
+      },
+    };
+  }).filter(Boolean);
 }
 
 export function parseTsimWorkbook(sheets, { configuration, operations }) {
@@ -332,5 +374,6 @@ export function parseTsimWorkbook(sheets, { configuration, operations }) {
   const operational = parseOperationalWorkbook(sheets, operations);
   const assumed = applyAssumptions({ assumptions, configuration: { ...configuration, cargos: cargoResult.cargos ?? configuration.cargos, encargos: cargoResult.encargos ?? configuration.encargos }, operations: operational.operations ?? operations });
   const scenarios = parseScenarioSheet(find('Cenários') ?? [], assumed.configuration.cargos);
-  return { configuration: assumed.configuration, operations: assumed.operations, people, assumptions, scenarios, costs: operational.costs, headcountBases: operational.headcountBases, counts: { cargos: cargoResult.count, people: people.length, assumptions: assumptions.length, dimensions: operational.dimensions.length, costs: operational.costs.length, scenarios: scenarios.length } };
+  const auditHistory = parseApprovalHistorySheet(find('Histórico') ?? find('Historico') ?? []);
+  return { configuration: assumed.configuration, operations: assumed.operations, people, assumptions, scenarios, auditHistory, costs: operational.costs, headcountBases: operational.headcountBases, counts: { cargos: cargoResult.count, people: people.length, assumptions: assumptions.length, dimensions: operational.dimensions.length, costs: operational.costs.length, scenarios: scenarios.length, auditEvents: auditHistory.length } };
 }

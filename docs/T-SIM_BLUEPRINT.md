@@ -8,7 +8,7 @@
 
 ## Estado atual do MVP local
 
-O MVP publicado opera como uma base própria do T-Sim, sem login, Supabase ou vínculo com o TConnect. Cada navegador pode manter perfis locais separados; a planilha padrão e o backup JSON são os meios de transporte entre aparelhos. A arquitetura multiusuário descrita adiante é uma evolução futura e não é requisito para o fluxo atual.
+O MVP publicado opera como uma base própria do T-Sim, sem login, Supabase ou vínculo com o TConnect. Cada navegador pode manter perfis locais separados; a planilha padrão e o backup Excel `.xlsx` são os meios de transporte entre aparelhos. A arquitetura multiusuário descrita adiante é uma evolução futura e não é requisito para o fluxo atual.
 
 ## 1. Objetivo do produto
 
@@ -312,13 +312,13 @@ Aplicar T-Vision Telecom Lab em toda tela, conteúdo e visualização:
 O protótipo executável atual cobre as fatias locais de People, Simulador, Cenários, Visão Geral,
 Ops e Pareceres:
 
-- a grade dos seis cargos e os encargos podem ser editados, restaurados e importados de `.xlsx`, `.xls` ou `.csv`;
+- a grade dos seis cargos e os encargos podem ser editados, restaurados e importados de `.xlsx`;
 - a planilha padrão pode ser importada em modo completo: cargos, pessoas, premissas, operação, custos operacionais e cenários são distribuídos pelos módulos locais correspondentes;
 - a quantidade automática financiável permanece visível junto do ajuste manual, com comparação e saldo mensal/anual;
 - cenários são salvos e reabertos no navegador, com snapshot de salários e encargos;
 - a Visão Geral consolida a estrutura e os cenários salvos;
 - Ops permite editar headcount, requisito, SLA e margem de segurança, calculando cobertura e risco projetado;
-- Pareceres registra os estados Rascunho, Enviado e Aprovado e exporta um resumo JSON local.
+- Pareceres registra os estados Rascunho, Enviado e Aprovado e exporta um resumo em Excel `.xlsx`.
 - Budget apresenta waterfall da folha e separa as premissas de encargos, ADM, BDI e margem.
 - Analytics apresenta os custos de Campo, Sala Técnica e classes de equipe extraídos da fonte operacional.
 - Analytics e Ops usam 672 HC da aba Custos Equipes como base operacional oficial. Os 609 HC do Controle Local permanecem visíveis apenas como referência comparativa, sem soma automática.
@@ -327,14 +327,14 @@ Ops e Pareceres:
 - A importação operacional preserva linhas com headcount mas alocação incompleta para correção em tela e informa linhas sem valores de HC que foram ignoradas. A planilha pode fornecer a coluna opcional `Movimento alocado` para iniciar no modo manual.
 - Importações parciais sem registros válidos de Pessoas, Premissas ou Cenários preservam os dados já existentes no perfil e informam essas seções ao usuário; custos da Sala Técnica usam as linhas de total da planilha de referência, sem dupla contagem dos componentes.
 - T-Sim AI apresenta um parecer local baseado em regras, perguntas de validação e classificação explícita como estimativa.
-- Pareceres oferece impressão/PDF pelo navegador, além de JSON e Excel; Configurações oferece backup e restauração do workspace em JSON.
-- Pareceres mantém até 500 eventos locais de transição de status por perfil, com horário e snapshot dos valores da decisão; o backup JSON inclui o histórico. A autoria não é verificada e o registro pode ser alterado ou apagado no navegador, portanto não substitui auditoria independente nem persistência server-side.
+- Pareceres oferece impressão/PDF pelo navegador e relatórios Excel `.xlsx`; Configurações oferece exportação e importação do backup completo em Excel `.xlsx`.
+- Pareceres mantém até 500 eventos locais de transição de status por perfil, com horário e snapshot dos valores da decisão; o backup Excel `.xlsx` inclui o histórico. A autoria não é verificada e o registro pode ser alterado ou apagado no navegador, portanto não substitui auditoria independente nem persistência server-side.
 - Configurações permite recuperar a grade e limpar os dados locais do ambiente demonstrativo.
-- Configurações permite criar perfis locais separados no mesmo navegador, alternar a base ativa e transportar dados por planilha ou backup JSON sem conta externa.
+- Configurações permite criar perfis locais separados no mesmo navegador, alternar a base ativa e transportar dados por planilha ou backup Excel `.xlsx` sem conta externa.
 - Perfis locais organizam dados apenas dentro do navegador: não são credenciais nem barreiras de acesso e não oferecem sincronização entre aparelhos.
 - O shell web inclui manifesto PWA, ícone instalável, service worker com fallback offline e configuração de rewrite para hospedagem estática.
 - O deploy público está conectado ao GitHub `TiconSantana/t-sim` e à Vercel `t-sim`.
-- O navegador guarda o workspace em `localStorage` e a tela Configurações permite exportar ou restaurar um backup JSON.
+- O navegador guarda o workspace em `localStorage` e a tela Configurações permite exportar um backup Excel `.xlsx`; a restauração ocorre por **Importar planilha completa**.
 - A planilha padrão permite preencher cargos, operação, pessoas, premissas e cenários; cada usuário importa o arquivo no próprio ambiente.
 
-O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O modo local abre sem login e sem dependência de serviço externo. Cada navegador mantém sua própria base e pode transportar dados por backup JSON ou pela planilha padrão.
+O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O modo local abre sem login e sem dependência de serviço externo. Cada navegador mantém sua própria base e pode transportar dados por backup Excel `.xlsx` ou pela planilha padrão.

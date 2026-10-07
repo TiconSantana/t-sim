@@ -9,7 +9,7 @@
 - Tema claro e tema escuro com tokens semânticos, contraste de estados, foco visível e controle persistente.
 - Entrada local, onboarding em três passos e página institucional com mockup do app.
 - Skip link, `aria-current` na navegação, foco no conteúdo e mensagens de salvamento com `aria-live`.
-- Relatório JSON com assinatura e identificação do ambiente.
+- Relatório Excel `.xlsx` com abas de identidade, parecer e histórico da decisão.
 - Planilha Excel com aba `Identidade`, metadados, larguras de coluna e aba `Parecer`.
 - Impressão/PDF com cabeçalho T-SIM e regras para remover controles de interface.
 - Service worker pré-carregando logo, favicon, símbolo, hero e mockup para o shell offline.
