@@ -14,6 +14,10 @@ const firstColumn = (headers, ...names) => headers.findIndex((header) => names.i
 const cell = (row, index, fallback = '') => index < 0 ? fallback : row[index] ?? fallback;
 const text = (value) => String(value ?? '').trim();
 
+export function retainExistingIfImportEmpty(imported, existing) {
+  return imported.length ? imported : existing;
+}
+
 function table(rows, headerMatcher) {
   const headerIndex = rows.findIndex((row) => row.some((item) => headerMatcher.includes(normalize(item))));
   if (headerIndex < 0) return null;
@@ -131,7 +135,7 @@ export function parseOperationalWorkbook(sheets, currentOperations) {
   const costs = [];
   const headcountBases = [];
   for (const [sheetName, rows] of sheetEntries) {
-    if (/custosequipes|campo|salatenica|controlelocal/.test(normalize(sheetName))) continue;
+    if (/custosequipes|campo|salatecnica|salatenica|controlelocal/.test(normalize(sheetName))) continue;
     const parsed = table(rows, ['regiao', 'turno', 'atividade', 'hcatual', 'headcountatual', 'headcount']);
     if (!parsed) continue;
     const { headers, body } = parsed;
@@ -267,13 +271,15 @@ function parseLegacyOperationalSheets(sheets) {
       }
     }
   }
-  const [roomName, roomRows] = entry('salatenica') || [];
+  const [roomName, roomRows] = entry('salatecnica') || entry('salatenica') || [];
   if (roomRows) {
     [0, 6, 12].forEach((start) => {
       const label = text(roomRows[0]?.[start]);
       if (!label) return;
-      const total = roomRows.slice(2).reduce((sum, row) => sum + (number(row[start + 2]) || 0), 0);
-      if (total > 0) addCost(label, total, roomRows.slice(2).reduce((sum, row) => sum + (number(row[start + 1]) || 0), 0), roomName, null);
+      const totalRow = roomRows.find((row) => normalize(row[start]).includes('custototal'));
+      const total = number(totalRow?.[start + 2]);
+      const headcount = number(totalRow?.[start + 1]);
+      if (total !== null && total > 0) addCost(label, total, headcount, roomName);
     });
   }
   const [localName, localRows] = entry('controlelocal') || [];

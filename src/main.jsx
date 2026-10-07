@@ -36,7 +36,7 @@ import { costAssumptions, operationalCosts, operationalSource, operationsDefault
 import { calculateSimulation } from './domain/simulation';
 import { calculateCoverage, calculateDimensionCoverage, validateScenarioForApproval } from './domain/operations';
 import { createLocalProfile, getActiveProfileId, loadApprovals, loadConfiguration, loadImportedAssumptions, loadLocalProfiles, loadOperations, loadPeople, loadSavedScenarios, normalizeOperations, saveApproval, saveConfiguration, saveImportedAssumptions, saveOperations, savePeople, saveScenario, saveScenarioList, setActiveProfile, workspaceStorageKey } from './storage/scenarios';
-import { parseDimensionSheet, parseTsimWorkbook } from './domain/workbookImport';
+import { parseDimensionSheet, parseTsimWorkbook, retainExistingIfImportEmpty } from './domain/workbookImport';
 import './styles.css';
 
 const navItems = [
@@ -402,7 +402,7 @@ function SettingsView({ configuration, operations, savedScenarios, approvals, pe
   const workbookInputRef = useRef(null);
   const [profileName, setProfileName] = useState('');
   async function importWorkspace(event) { const file = event.target.files?.[0]; if (!file) return; try { const payload = JSON.parse(await file.text()); if (payload?.produto !== 'T-Sim' || !payload.configuration?.cargos || !payload.operations) throw new Error('invalid'); onRestoreWorkspace(payload); setMessage('Backup restaurado neste navegador.'); } catch { setMessage('Arquivo inválido. Escolha um backup JSON exportado pelo T-Sim.'); } finally { event.target.value = ''; } }
-  async function importWorkbook(event) { const file = event.target.files?.[0]; if (!file) return; try { const result = await onImportWorkbook(file); setMessage(`Planilha importada: ${result.counts.cargos} cargos, ${result.counts.people} pessoas, ${result.counts.assumptions} premissas, ${result.counts.dimensions} dimensões, ${result.counts.costs} custos e ${result.counts.scenarios} cenários.`); } catch (error) { setMessage(error.message || 'Não foi possível importar a planilha completa.'); } finally { event.target.value = ''; } }
+  async function importWorkbook(event) { const file = event.target.files?.[0]; if (!file) return; try { const result = await onImportWorkbook(file); const preserved = result.preservedSections?.length ? ` Seções sem registros válidos preservadas no perfil: ${result.preservedSections.join(', ')}.` : ''; setMessage(`Planilha importada: ${result.counts.cargos} cargos, ${result.counts.people} pessoas, ${result.counts.assumptions} premissas, ${result.counts.dimensions} dimensões, ${result.counts.costs} custos e ${result.counts.scenarios} cenários.${preserved}`); } catch (error) { setMessage(error.message || 'Não foi possível importar a planilha completa.'); } finally { event.target.value = ''; } }
   function createProfile() { const profile = onCreateProfile(profileName); if (profile) { setProfileName(''); setMessage(`Perfil local “${profile.name}” criado.`); } }
   return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> CONFIGURAÇÕES</div><h1>Controle as<br /><em>premissas locais.</em></h1><p>O T-Sim usa uma base própria por ambiente. Os dados importados ficam disponíveis somente neste navegador e não são enviados a outro sistema.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Ambiente atual</div><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base própria · local'}</strong><span>Dados disponíveis neste aparelho</span><button onClick={() => setMessage('O T-Sim está operando com a base própria local deste navegador.')}>Ver status <ChevronRight size={14} /></button></div></section><section className="settings-grid"><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Base própria e governança</h2><p>Dados carregados pelo usuário</p></div></div></div><div className="settings-list"><div><span>Ambiente</span><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base T-Sim · usuário atual'}</strong></div><div><span>Persistência</span><strong>localStorage · perfil local selecionado</strong></div><div><span>Compartilhamento externo</span><strong>Desativado</strong></div><div><span>Registros importados</span><strong>{people.length} pessoas · {assumptions.length} premissas</strong></div><div><span>Classificação dos resultados</span><strong>Informados, calculados e estimados</strong></div></div><div className="profile-switcher"><label><span>Perfil local</span><select value={activeProfileId} onChange={(event) => onProfileChange(event.target.value)}>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label><div className="profile-create"><input value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Nome da nova base" /><button className="secondary-button" type="button" onClick={createProfile}>Criar perfil</button></div></div><div className="panel-note profile-limit-note"><ShieldCheck size={16} /><span>Perfis são uma organização local, não contas protegidas: qualquer pessoa com acesso a este navegador pode alternar entre eles. Não guarde aqui dados pessoais que exijam controle de acesso.</span></div></div><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Planilha padrão</h2><p>Alimente todas as áreas do seu ambiente</p></div></div></div><div className="settings-actions"><a className="secondary-button" href="/templates/tsim-planilha-padrao.xlsx" download>Baixar planilha padrão</a><input ref={workbookInputRef} hidden type="file" accept=".xlsx,.xls,.csv" onChange={importWorkbook} /><button className="secondary-button" onClick={() => workbookInputRef.current?.click()}>Importar planilha completa</button><button className="secondary-button" onClick={reset}>Restaurar cargos e encargos</button><button className="secondary-button" onClick={clear}>Limpar dados locais</button></div><div className="settings-backup"><input ref={fileInputRef} hidden type="file" accept="application/json,.json" onChange={importWorkspace} /><button className="secondary-button" onClick={exportWorkspace}>Exportar backup JSON</button><button className="secondary-button" onClick={() => fileInputRef.current?.click()}>Restaurar backup JSON</button></div>{message && <div className="settings-message"><Check size={15} />{message}</div>}<div className="panel-note"><ShieldCheck size={16} /><span>As abas Cargos, Pessoas, Premissas, Operação e Cenários são processadas localmente. Revise fonte, vigência e cobertura antes de salvar.</span></div></div></section></>;
 }
@@ -602,18 +602,30 @@ function App() {
     const nextOperations = normalizeOperations(result.operations, operationsDefaults);
     saveConfiguration(nextConfiguration);
     saveOperations(nextOperations);
-    savePeople(result.people);
-    saveImportedAssumptions(result.assumptions);
-    saveScenarioList(result.scenarios);
-    const importedApprovals = Object.fromEntries(result.scenarios.filter((scenario) => scenario.importedStatus).map((scenario) => [scenario.id, { status: scenario.importedStatus.includes('aprov') ? 'Aprovado' : scenario.importedStatus.includes('envi') ? 'Enviado' : 'Rascunho', updatedAt: new Date().toISOString() }]));
-    window.localStorage.setItem(workspaceStorageKey('tsim.approvals.v1'), JSON.stringify(importedApprovals));
+    const nextPeople = retainExistingIfImportEmpty(result.people, people);
+    const nextAssumptions = retainExistingIfImportEmpty(result.assumptions, assumptions);
+    const nextScenarios = retainExistingIfImportEmpty(result.scenarios, savedScenarios);
+    if (result.people.length) savePeople(nextPeople);
+    if (result.assumptions.length) saveImportedAssumptions(nextAssumptions);
+    if (result.scenarios.length) saveScenarioList(nextScenarios);
+    const nextApprovals = result.scenarios.length
+      ? Object.fromEntries(result.scenarios.filter((scenario) => scenario.importedStatus).map((scenario) => [scenario.id, { status: scenario.importedStatus.includes('aprov') ? 'Aprovado' : scenario.importedStatus.includes('envi') ? 'Enviado' : 'Rascunho', updatedAt: new Date().toISOString() }]))
+      : approvals;
+    if (result.scenarios.length) window.localStorage.setItem(workspaceStorageKey('tsim.approvals.v1'), JSON.stringify(nextApprovals));
     setConfiguration(nextConfiguration);
     setOperations(nextOperations);
-    setPeople(result.people);
-    setAssumptions(result.assumptions);
-    setSavedScenarios(result.scenarios);
-    setApprovals(importedApprovals);
-    return result;
+    setPeople(nextPeople);
+    setAssumptions(nextAssumptions);
+    setSavedScenarios(nextScenarios);
+    setApprovals(nextApprovals);
+    return {
+      ...result,
+      preservedSections: [
+        !result.people.length && 'Pessoas',
+        !result.assumptions.length && 'Premissas',
+        !result.scenarios.length && 'Cenários',
+      ].filter(Boolean),
+    };
   }
 
   function snapshotScenario() {

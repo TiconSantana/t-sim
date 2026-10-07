@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDimensionSheet, parseTsimWorkbook } from '../src/domain/workbookImport.js';
+import { parseDimensionSheet, parseTsimWorkbook, retainExistingIfImportEmpty } from '../src/domain/workbookImport.js';
 import { cargos } from '../src/data/cargos.js';
 
 test('importa a planilha padrão nas áreas do perfil local', () => {
@@ -55,6 +55,23 @@ test('reconhece headcount oficial e comparativo da planilha operacional legada',
   assert.ok(result.counts.costs >= 1);
 });
 
+test('usa as linhas de custo total da Sala Técnica sem somar novamente seus componentes', () => {
+  const sheets = {
+    'Sala Técnica': [
+      ['SALA TÉCNICA - MANUTENÇÃO', null, null, null, null, null, 'SALA TÉCNICA - ENGENHARIA', null, null, null, null, null, 'SALA TÉCNICA - PROJETOS'],
+      ['COORDENADOR', 1, 21570, null, null, null, 'COORDENADOR', 1, 27410, null, null, null, 'PROJETISTA', 9, 103174],
+      ['ASSISTENTE', 6, 56566, null, null, null, 'ANALISTA', 5, 74042, null, null, null, 'PROJETISTA II', 4, 58564],
+      ['CUSTO TOTAL SL - MANUTENÇÃO', 10, 107885, null, null, null, 'CUSTO TOTAL SL - ENGENHARIA', 14, 178339, null, null, null, 'CUSTO TOTAL SL - PROJETOS', 21, 296030],
+    ],
+  };
+  const result = parseTsimWorkbook(sheets, { configuration: { cargos, encargos: 1.13 }, operations: {} });
+  assert.deepEqual(result.costs.map(({ label, headcount, monthlyCost }) => [label, headcount, monthlyCost]), [
+    ['SALA TÉCNICA - MANUTENÇÃO', 10, 107885],
+    ['SALA TÉCNICA - ENGENHARIA', 14, 178339],
+    ['SALA TÉCNICA - PROJETOS', 21, 296030],
+  ]);
+});
+
 test('preserva linhas operacionais incompletas para correção, sem descartá-las silenciosamente', () => {
   const parsed = parseDimensionSheet([
     ['Região', 'Turno', 'Atividade', 'HC atual', 'HC requerido', 'Capacidade por HC', 'Movimento alocado', 'Fonte', 'Vigência'],
@@ -68,4 +85,10 @@ test('preserva linhas operacionais incompletas para correção, sem descartá-la
   assert.equal(parsed.rows[0].currentHeadcount, 1234);
   assert.deepEqual(parsed.rows[1].missingFields, ['região']);
   assert.equal(parsed.allocationMode, 'manual');
+});
+
+test('importação sem registros válidos em uma seção preserva a base existente', () => {
+  const existing = [{ id: 'existing-1' }];
+  assert.strictEqual(retainExistingIfImportEmpty([], existing), existing);
+  assert.deepEqual(retainExistingIfImportEmpty([{ id: 'imported-1' }], existing), [{ id: 'imported-1' }]);
 });

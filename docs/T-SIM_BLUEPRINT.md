@@ -325,6 +325,7 @@ Ops e Pareceres:
 - Ops permite dimensionar linhas por região, turno e atividade, com capacidade por HC, cobertura projetada, fonte, vigência e bloqueio explícito quando o rateio necessário não foi informado.
 - O movimento do cenário pode ser distribuído automaticamente pelo HC de cada dimensão com arredondamento equilibrado, ou alocado manualmente por região/turno/atividade; divergência entre posições simuladas e alocadas bloqueia aprovação.
 - A importação operacional preserva linhas com headcount mas alocação incompleta para correção em tela e informa linhas sem valores de HC que foram ignoradas. A planilha pode fornecer a coluna opcional `Movimento alocado` para iniciar no modo manual.
+- Importações parciais sem registros válidos de Pessoas, Premissas ou Cenários preservam os dados já existentes no perfil e informam essas seções ao usuário; custos da Sala Técnica usam as linhas de total da planilha de referência, sem dupla contagem dos componentes.
 - T-Sim AI apresenta um parecer local baseado em regras, perguntas de validação e classificação explícita como estimativa.
 - Pareceres oferece impressão/PDF pelo navegador, além de JSON e Excel; Configurações oferece backup e restauração do workspace em JSON.
 - Configurações permite recuperar a grade e limpar os dados locais do ambiente demonstrativo.
