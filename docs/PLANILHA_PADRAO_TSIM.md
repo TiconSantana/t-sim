@@ -37,3 +37,5 @@ Arquivo para download: [`public/templates/tsim-planilha-padrao.xlsx`](../public/
 ## Privacidade e armazenamento
 
 O T-Sim não envia o conteúdo para TConnect, Supabase ou outro sistema. O arquivo é processado no navegador e os resultados ficam no `localStorage` do ambiente atual. Perfis locais organizam bases no mesmo navegador, mas não são contas nem barreiras de acesso. Para levar uma base a outro aparelho, exporte o backup JSON ou a planilha preenchida e faça a importação manual no novo navegador.
+
+O histórico local de decisões registra transições de status com data e snapshot do cenário, por perfil, e pode ser incluído no backup JSON. A autoria não é verificada; qualquer pessoa com acesso ao navegador pode alterar ou apagar esses dados. Esse registro é informativo e não substitui auditoria independente ou persistência em servidor.

@@ -4,8 +4,10 @@ const OPS_KEY = 'tsim.operations.v1';
 const APPROVALS_KEY = 'tsim.approvals.v1';
 const PEOPLE_KEY = 'tsim.people.v1';
 const ASSUMPTIONS_KEY = 'tsim.imported-assumptions.v1';
+const AUDIT_HISTORY_KEY = 'tsim.approval-history.v1';
 const PROFILES_KEY = 'tsim.local-profiles.v1';
 const ACTIVE_PROFILE_KEY = 'tsim.active-profile.v1';
+const MAX_AUDIT_EVENTS = 500;
 
 function canUseStorage() {
   return typeof window !== 'undefined' && Boolean(window.localStorage);
@@ -163,9 +165,55 @@ export function loadApprovals() {
   }
 }
 
-export function saveApproval(scenarioId, approval) {
+export function saveApproval(scenarioId, approval, scenario = null) {
   const current = loadApprovals();
-  const next = { ...current, [scenarioId]: { ...approval, updatedAt: new Date().toISOString() } };
+  const updatedAt = new Date().toISOString();
+  const next = { ...current, [scenarioId]: { ...approval, updatedAt } };
   if (canUseStorage()) window.localStorage.setItem(workspaceStorageKey(APPROVALS_KEY), JSON.stringify(next));
+  if (scenario) {
+    const event = createApprovalAuditEvent({ scenario, previousStatus: current[scenarioId]?.status || 'Rascunho', nextStatus: approval.status, recordedAt: updatedAt });
+    if (event) saveApprovalHistory(appendApprovalAuditEvent(loadApprovalHistory(), event));
+  }
   return next;
+}
+
+export function loadApprovalHistory() {
+  if (!canUseStorage()) return [];
+  try {
+    const events = JSON.parse(window.localStorage.getItem(workspaceStorageKey(AUDIT_HISTORY_KEY)) || '[]');
+    return Array.isArray(events)
+      ? events.filter((event) => event && typeof event === 'object' && event.type === 'approval-status-change' && event.scenarioId && event.nextStatus).slice(0, MAX_AUDIT_EVENTS)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function createApprovalAuditEvent({ scenario, previousStatus, nextStatus, recordedAt = new Date().toISOString(), profileId = getActiveProfileId() }) {
+  if (!scenario?.id || !nextStatus || previousStatus === nextStatus) return null;
+  return {
+    id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    type: 'approval-status-change',
+    scenarioId: scenario.id,
+    scenarioName: scenario.name || 'Cenário sem nome',
+    previousStatus: previousStatus || 'Rascunho',
+    nextStatus,
+    recordedAt,
+    profileId,
+    source: 'Ação registrada neste navegador',
+    scenarioSnapshot: JSON.parse(JSON.stringify(scenario)),
+  };
+}
+
+export function appendApprovalAuditEvent(events, event, maxEvents = MAX_AUDIT_EVENTS) {
+  return event ? [event, ...(Array.isArray(events) ? events : [])].slice(0, maxEvents) : events;
+}
+
+export function saveApprovalHistory(events) {
+  if (!canUseStorage()) return false;
+  const history = Array.isArray(events)
+    ? events.filter((event) => event && typeof event === 'object' && event.type === 'approval-status-change' && event.scenarioId && event.nextStatus).slice(0, MAX_AUDIT_EVENTS)
+    : [];
+  window.localStorage.setItem(workspaceStorageKey(AUDIT_HISTORY_KEY), JSON.stringify(history));
+  return true;
 }

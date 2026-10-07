@@ -328,6 +328,7 @@ Ops e Pareceres:
 - Importações parciais sem registros válidos de Pessoas, Premissas ou Cenários preservam os dados já existentes no perfil e informam essas seções ao usuário; custos da Sala Técnica usam as linhas de total da planilha de referência, sem dupla contagem dos componentes.
 - T-Sim AI apresenta um parecer local baseado em regras, perguntas de validação e classificação explícita como estimativa.
 - Pareceres oferece impressão/PDF pelo navegador, além de JSON e Excel; Configurações oferece backup e restauração do workspace em JSON.
+- Pareceres mantém até 500 eventos locais de transição de status por perfil, com horário e snapshot dos valores da decisão; o backup JSON inclui o histórico. A autoria não é verificada e o registro pode ser alterado ou apagado no navegador, portanto não substitui auditoria independente nem persistência server-side.
 - Configurações permite recuperar a grade e limpar os dados locais do ambiente demonstrativo.
 - Configurações permite criar perfis locais separados no mesmo navegador, alternar a base ativa e transportar dados por planilha ou backup JSON sem conta externa.
 - Perfis locais organizam dados apenas dentro do navegador: não são credenciais nem barreiras de acesso e não oferecem sincronização entre aparelhos.
