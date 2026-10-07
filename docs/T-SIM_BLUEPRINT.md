@@ -344,10 +344,12 @@ O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O mod
 **Atualizado:** 07/10/2026
 
 - A suíte `pnpm test` contém 21 verificações e passou integralmente neste ciclo. Inclui limites financeiros, promoção manual acima do automático, elegibilidade, cobertura, importações Excel e restauração do histórico.
+- A dependência Excel vulnerável `xlsx@0.18.5` foi substituída pelo espelho npm comunitário `@e965/xlsx@0.20.3`, que publica a versão corrigida do SheetJS. `pnpm audit --prod` não reporta vulnerabilidades conhecidas após a troca; a instalação está fixada na versão usada.
+- A hospedagem Vercel envia `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options` e `Permissions-Policy`; o cabeçalho de cache próprio do service worker foi mantido.
 - O importador `.xlsx` reconhece nomes alternativos comuns para cargos, região, período/turno, atividade, headcount e capacidade; também interpreta valores textuais em formatos numéricos brasileiros e norte-americanos.
 - Os formatos de cargos dos anexos `Ferramenta_Planejamento_Promocoes` (Cadastro de Cargos com coluna `Salário Base (R$)`) e `Simulador_Promocoes_Tecnicos` (pares Cargo/Salário de origem e destino) agora são reconhecidos. Divergências de salário para o mesmo cargo são ignoradas e reportadas na mensagem da importação para revisão humana.
 - O backup Excel cobre Cargos, Pessoas, Premissas, Operação, Custos, Headcount, Cenários e Histórico. A importação continua restrita ao formato `.xlsx`.
-- No build de produção, o JavaScript inicial ficou em 361,53 KB (104,95 KB gzip). A biblioteca Excel é emitida como chunk separado de 423,91 KB (141,25 KB gzip) e é importada sob demanda em operações de arquivo; não é parte do carregamento inicial.
+- No build de produção, o JavaScript inicial ficou em 361,53 KB (104,95 KB gzip). A biblioteca Excel é emitida como chunk separado de 492,27 KB (160,41 KB gzip) e é importada sob demanda em operações de arquivo; não é parte do carregamento inicial.
 - Os avisos de build sobre `use client` vêm de `lucide-react` e não impedem a compilação.
 
 ### Itens deliberadamente fora desta entrega

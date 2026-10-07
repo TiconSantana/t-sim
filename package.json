@@ -15,6 +15,6 @@
     "react": "latest",
     "react-dom": "latest",
     "vite": "latest",
-    "xlsx": "^0.18.5"
+    "xlsx": "npm:@e965/xlsx@0.20.3"
   }
 }

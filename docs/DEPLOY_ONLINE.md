@@ -15,6 +15,8 @@ O T-Sim está publicado em [https://t-sim.vercel.app](https://t-sim.vercel.app) 
 - **Base própria por usuário:** os dados importados e calculados ficam isolados no navegador do usuário atual.
 - **Planilha padrão:** o arquivo `.xlsx` pode ser baixado em Configurações, preenchido pelo usuário e importado pela opção **Importar planilha completa**. As abas Cargos, Pessoas, Premissas, Operação e Cenários são lidas localmente; a importação também reconhece a estrutura operacional da planilha de custos V.TAL.
 - **Variáveis externas:** nenhuma variável de Supabase ou TConnect é necessária no projeto Vercel.
+- **Cabeçalhos de segurança:** a Vercel envia `nosniff`, política de referência restrita, bloqueio de enquadramento e desativa câmera, microfone e geolocalização.
+- **Planilhas enviadas:** o app usa o espelho npm comunitário `@e965/xlsx@0.20.3`, que publica a versão corrigida do SheetJS e não tem dependências próprias. O leitor Excel é carregado sob demanda ao abrir ou exportar `.xlsx`.
 
 ## Publicação
 
