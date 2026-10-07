@@ -338,3 +338,19 @@ Ops e Pareceres:
 - A planilha padrão permite preencher cargos, operação, pessoas, premissas e cenários; cada usuário importa o arquivo no próprio ambiente.
 
 O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O modo local abre sem login e sem dependência de serviço externo. Cada navegador mantém sua própria base e pode transportar dados por backup Excel `.xlsx` ou pela planilha padrão.
+
+## 12. Fechamento da Fase 5 — hardening local
+
+**Atualizado:** 07/10/2026
+
+- A suíte `pnpm test` contém 18 verificações e passou integralmente neste ciclo. Inclui limites financeiros, promoção manual acima do automático, elegibilidade, cobertura, importações Excel e restauração do histórico.
+- O importador `.xlsx` reconhece nomes alternativos comuns para cargos, região, período/turno, atividade, headcount e capacidade; também interpreta valores textuais em formatos numéricos brasileiros e norte-americanos.
+- O backup Excel cobre Cargos, Pessoas, Premissas, Operação, Custos, Headcount, Cenários e Histórico. A importação continua restrita ao formato `.xlsx`.
+- No build de produção, o JavaScript inicial ficou em 360,22 KB (104,45 KB gzip). A biblioteca Excel é emitida como chunk separado de 423,91 KB (141,25 KB gzip) e é importada sob demanda em operações de arquivo; não é parte do carregamento inicial.
+- Os avisos de build sobre `use client` vêm de `lucide-react` e não impedem a compilação.
+
+### Itens deliberadamente fora desta entrega
+
+A autenticação, permissões por usuário e auditoria persistente em servidor continuam fora do modo local atualmente escolhido. Os dados permanecem no navegador e a transferência entre aparelhos é manual por arquivo Excel. Para habilitar sincronização real entre dispositivos, será necessário reabrir o escopo de backend próprio do T-Sim; essa decisão não será substituída por uma dependência do TConnect.
+
+O importador segue preparado para planilhas `.xlsx` com os aliases listados, além das fontes operacionais atualmente reconhecidas. Estruturas novas e específicas de outras empresas ainda precisam ser mapeadas a partir de uma planilha de exemplo.

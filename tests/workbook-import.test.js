@@ -92,3 +92,48 @@ test('importação sem registros válidos em uma seção preserva a base existen
   assert.strictEqual(retainExistingIfImportEmpty([], existing), existing);
   assert.deepEqual(retainExistingIfImportEmpty([{ id: 'imported-1' }], existing), [{ id: 'imported-1' }]);
 });
+
+test('reconhece nomes alternativos de colunas e valores monetários nos padrões BR e US', () => {
+  const workbook = {
+    Cargos: [
+      ['Função', 'Salário mensal', 'Percentual encargos', 'Origem', 'Validade'],
+      ['Auxiliar de Fibra Óptica', 'R$ 1.234,56', '113%', 'Acordo coletivo', '2026'],
+    ],
+    Operação: [
+      ['Regional Operacional', 'Período', 'Tipo de Atividade', 'Headcount atual', 'HC ideal', 'Capacidade por Pessoa'],
+      ['BA', 'Noturno', 'Instalação', '1,234.50', '1.300', '0,75'],
+    ],
+  };
+  const result = parseTsimWorkbook(workbook, { configuration: { cargos, encargos: 1.13 }, operations: { slaTarget: 95, safetyBuffer: 0, dimensions: [] } });
+  assert.equal(result.configuration.cargos.find((cargo) => cargo.id === 'auxiliar').salary, 1234.56);
+  assert.equal(result.configuration.encargos, 1.13);
+  assert.equal(result.operations.dimensions[0].currentHeadcount, 1234.5);
+  assert.equal(result.operations.dimensions[0].requiredHeadcount, 1300);
+  assert.equal(result.operations.dimensions[0].capacityPerPerson, 0.75);
+  const invalidNumbers = parseDimensionSheet([
+    ['Região', 'Turno', 'Atividade', 'HC atual', 'HC requerido'],
+    ['BA', 'Dia', 'Instalação', 'N/A', '—'],
+  ]);
+  assert.equal(invalidNumbers.rows.length, 0);
+  assert.equal(invalidNumbers.skippedRows, 1);
+});
+
+test('restaura abas de custo, headcount, cenário e histórico do backup Excel', () => {
+  const workbook = {
+    Cargos: [['Cargo', 'Salário base', 'Encargos (%)'], ['Auxiliar de Fibra Óptica', 1800, 113]],
+    Operação: [['Região', 'Turno', 'Atividade', 'HC atual', 'HC requerido'], ['BA', 'Dia', 'Instalação', 672, 672]],
+    Custos: [['Classe de equipe', 'HC atual', 'Custo mensal', 'Custo por HC', 'Fonte', 'Vigência'], ['Equipe FTTH', 12, 120000, 10000, 'Controladoria', '2026']],
+    Headcount: [['Classe de equipe', 'HC atual', 'Fonte'], ['Base oficial', 672, 'Custos Equipes']],
+    Cenários: [['ID', 'Nome do cenário', 'Data', 'Cargo desligado', 'Quantidade', 'Cargo origem', 'Cargo destino', 'Promoções automáticas', 'Promoções manuais', 'Saldo mensal', 'Status'], ['scenario-original', 'Promoção BA', '2026-10-07', 'Auxiliar de Fibra Óptica', 1, 'Técnico de Fibra Óptica II', 'Técnico de Fibra Óptica N/3', 4, '', 2500, 'Aprovado']],
+    Histórico: [['ID do evento', 'ID do cenário', 'Cenário', 'Status anterior', 'Status novo', 'Registrado em', 'Quantidade', 'Promoções automáticas', 'Promoções aplicadas', 'Saldo mensal', 'Saldo anual', 'Cobertura operacional', 'Encargos', 'Delta por promoção', 'Fonte'], ['event-1', 'scenario-original', 'Promoção BA', 'Enviado', 'Aprovado', '2026-10-07T10:00:00.000Z', 1, 4, 4, 2500, 30000, 99.5, 1.13, 100, 'MVP local']],
+  };
+  const result = parseTsimWorkbook(workbook, { configuration: { cargos, encargos: 1.13 }, operations: { dimensions: [] } });
+  assert.equal(result.scenarios[0].id, 'scenario-original');
+  assert.equal(result.scenarios[0].importedStatus, 'aprovado');
+  assert.equal(result.counts.costs, 1);
+  assert.equal(result.costs[0].monthlyCost, 120000);
+  assert.ok(result.headcountBases.some((row) => row.headcount === 672));
+  assert.equal(result.auditHistory[0].type, 'approval-status-change');
+  assert.equal(result.auditHistory[0].id, 'event-1');
+  assert.equal(result.auditHistory[0].scenarioSnapshot.appliedAnnualBalance, 30000);
+});

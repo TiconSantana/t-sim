@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cargos, ENCARGOS } from '../src/data/cargos.js';
 import { operationalDimensions } from '../src/data/operacao.js';
-import { calculateDimensionCoverage, calculateCoverage } from '../src/domain/operations.js';
+import { calculateDimensionCoverage, calculateCoverage, validateScenarioForApproval } from '../src/domain/operations.js';
 import { calculateSimulation } from '../src/domain/simulation.js';
 
 test('calcula quatro promoções automáticas no cenário auxiliar para técnico II', () => {
@@ -40,6 +40,31 @@ test('mantém a escolha manual e calcula a diferença para o automático', () =>
   assert.equal(result.appliedPromotions, 3);
   assert.equal(result.manualDifference, -1);
   assert.ok(result.manualBalance > result.balance);
+});
+
+test('escala a economia com a quantidade desligada e mantém o limite automático pelo orçamento', () => {
+  const onePosition = calculateSimulation({ dismissedRole: 'auxiliar', quantity: 1, originRole: 'tecnico-ii', destinationRole: 'tecnico-n3', activeScenario: 'balanced', manualMode: false, cargoList: cargos, encargos: ENCARGOS });
+  const threePositions = calculateSimulation({ dismissedRole: 'auxiliar', quantity: 3, originRole: 'tecnico-ii', destinationRole: 'tecnico-n3', activeScenario: 'balanced', manualMode: false, cargoList: cargos, encargos: ENCARGOS });
+  assert.equal(threePositions.economy, onePosition.economy * 3);
+  assert.ok(threePositions.promotions >= onePosition.promotions);
+  assert.ok(threePositions.economy - threePositions.promotions * threePositions.delta >= 0);
+});
+
+test('permite simular acima do automático e impede aprovação quando o saldo fica negativo', () => {
+  const result = calculateSimulation({ dismissedRole: 'auxiliar', quantity: 1, originRole: 'tecnico-ii', destinationRole: 'tecnico-n3', activeScenario: 'balanced', manualMode: true, manualPromotions: 5, cargoList: cargos, encargos: ENCARGOS });
+  assert.equal(result.promotions, 4);
+  assert.equal(result.appliedPromotions, 5);
+  assert.ok(result.appliedBalance < 0);
+  const validation = validateScenarioForApproval({ scenario: { source: 'Base local', appliedBalance: result.appliedBalance, budgetBlocked: true, promotionBlocked: false } });
+  assert.equal(validation.valid, false);
+  assert.equal(validation.insufficientBudget, true);
+});
+
+test('bloqueia promoção para cargo de mesmo nível ou inferior', () => {
+  const result = calculateSimulation({ dismissedRole: 'auxiliar', quantity: 1, originRole: 'tecnico-n3', destinationRole: 'tecnico-ii', activeScenario: 'balanced', manualMode: false, cargoList: cargos, encargos: ENCARGOS });
+  assert.equal(result.promotionEligible, false);
+  assert.equal(result.promotions, 0);
+  assert.equal(result.appliedPromotions, 0);
 });
 
 test('dimensiona a base oficial de 672 e projeta o movimento', () => {

@@ -4,9 +4,25 @@ const normalize = (value) => String(value ?? '')
 
 const number = (value) => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  const text = String(value ?? '').trim();
+  let text = String(value ?? '').trim().replace(/[\s\u00a0]/g, '');
   if (!text) return null;
-  const parsed = Number(text.replace(/\./g, '').replace(',', '.'));
+  const negative = /^\(.*\)$/.test(text);
+  text = text.replace(/[()]/g, '').replace(/[^\d,.-]/g, '');
+  if (!/^-?(?:\d+(?:[.,]\d+)*|[.,]\d+)$/.test(text)) return null;
+  const comma = text.lastIndexOf(',');
+  const dot = text.lastIndexOf('.');
+  if (comma >= 0 && dot >= 0) {
+    const decimal = comma > dot ? ',' : '.';
+    const thousands = decimal === ',' ? /\./g : /,/g;
+    text = text.replace(thousands, '').replace(decimal, '.');
+  } else if (comma >= 0 || dot >= 0) {
+    const separator = comma >= 0 ? ',' : '.';
+    const parts = text.split(separator);
+    const thousandsOnly = parts.length > 2 || (parts.length === 2 && parts[1].length === 3 && parts[0].length > 0 && Number(parts[0]) !== 0);
+    text = thousandsOnly ? parts.join('') : `${parts.slice(0, -1).join('')}.${parts.at(-1)}`;
+  }
+  let parsed = Number(text);
+  if (negative) parsed *= -1;
   return Number.isFinite(parsed) ? parsed : null;
 };
 
@@ -35,12 +51,12 @@ const roleId = (label, cargos) => {
 };
 
 export function parseCargoSheet(rows, cargos) {
-  const parsed = table(rows, ['cargo', 'salariobase', 'remuneracao']);
+  const parsed = table(rows, ['cargo', 'funcao', 'nomecargo', 'salariobase', 'salariomensal', 'salario', 'remuneracao', 'remuneracaoatual', 'valor', 'valorsalario']);
   if (!parsed) return { cargos: null, encargos: null, count: 0 };
   const { headers, body } = parsed;
   const nameCol = firstColumn(headers, 'cargo', 'funcao', 'nomecargo');
-  const salaryCol = firstColumn(headers, 'salariobase', 'salario', 'remuneracao', 'valor');
-  const burdenCol = firstColumn(headers, 'encargos', 'encargospercentual', 'percentualdeencargos');
+  const salaryCol = firstColumn(headers, 'salariobase', 'salariomensal', 'salarioatual', 'salario', 'remuneracao', 'remuneracaoatual', 'valor', 'valorsalario');
+  const burdenCol = firstColumn(headers, 'encargos', 'encargospercentual', 'percentualdeencargos', 'percentualencargos');
   const sourceCol = firstColumn(headers, 'fonte', 'origem', 'source');
   const validityCol = firstColumn(headers, 'vigencia', 'validade', 'versao');
   const ownerCol = firstColumn(headers, 'responsavel', 'proprietario');
@@ -68,20 +84,20 @@ export function parseCargoSheet(rows, cargos) {
 }
 
 export function parsePeopleSheet(rows) {
-  const parsed = table(rows, ['nome', 'matricula', 'email']);
+  const parsed = table(rows, ['nome', 'nomecompleto', 'colaborador', 'funcionario', 'matricula', 'email']);
   if (!parsed) return [];
   const { headers, body } = parsed;
   const cols = {
-    name: firstColumn(headers, 'nome', 'colaborador', 'funcionario'),
-    employeeId: firstColumn(headers, 'matricula', 'id', 'registro'),
+    name: firstColumn(headers, 'nome', 'nomecompleto', 'colaborador', 'funcionario'),
+    employeeId: firstColumn(headers, 'matricula', 'matriculaid', 'id', 'registro', 'registrofuncional'),
     email: firstColumn(headers, 'email', 'e-mail'),
     role: firstColumn(headers, 'cargo', 'funcao'),
     level: firstColumn(headers, 'nivel', 'level'),
-    region: firstColumn(headers, 'regiao', 'regional', 'uf'),
-    shift: firstColumn(headers, 'turno', 'jornada'),
-    activity: firstColumn(headers, 'atividade', 'operacao'),
-    status: firstColumn(headers, 'status', 'situacao'),
-    admissionDate: firstColumn(headers, 'dataadmissao', 'admissao'),
+    region: firstColumn(headers, 'regiao', 'regional', 'regionaloperacional', 'areaoperacional', 'polo', 'uf'),
+    shift: firstColumn(headers, 'turno', 'jornada', 'periodo'),
+    activity: firstColumn(headers, 'atividade', 'atividadeoperacional', 'tipoatividade', 'servico', 'operacao'),
+    status: firstColumn(headers, 'status', 'statusatual', 'situacao', 'situacaoatual'),
+    admissionDate: firstColumn(headers, 'dataadmissao', 'admissao', 'datadeadmissao'),
     salary: firstColumn(headers, 'salariobase', 'salario', 'remuneracao'),
     notes: firstColumn(headers, 'observacao', 'observacoes', 'notas'),
   };
@@ -136,14 +152,14 @@ export function parseOperationalWorkbook(sheets, currentOperations) {
   const headcountBases = [];
   for (const [sheetName, rows] of sheetEntries) {
     if (/custosequipes|campo|salatecnica|salatenica|controlelocal/.test(normalize(sheetName))) continue;
-    const parsed = table(rows, ['regiao', 'turno', 'atividade', 'hcatual', 'headcountatual', 'headcount']);
+    const parsed = table(rows, ['regiao', 'regional', 'regionaloperacional', 'areaoperacional', 'polo', 'turno', 'periodo', 'atividade', 'atividadeoperacional', 'tipoatividade', 'servico', 'hcatual', 'headcountatual', 'headcount']);
     if (!parsed) continue;
     const { headers, body } = parsed;
     const col = {
-      region: firstColumn(headers, 'regiao', 'regional', 'uf'), shift: firstColumn(headers, 'turno', 'jornada'),
-      activity: firstColumn(headers, 'atividade', 'funcao', 'operacao'), teamClass: firstColumn(headers, 'classe', 'classeequipe', 'classedeequipe', 'equipe', 'tipodeequipe'),
-      current: firstColumn(headers, 'hcatual', 'headcountatual', 'headcount', 'hc', 'quantidadehc'), required: firstColumn(headers, 'hcrequerido', 'headcountrequerido', 'requerido', 'necessario'),
-      capacity: firstColumn(headers, 'capacidadeporhc', 'capacidade', 'producao'), sla: firstColumn(headers, 'sla', 'slaalvo'), safety: firstColumn(headers, 'margemseguranca', 'margemdeseguranca'),
+      region: firstColumn(headers, 'regiao', 'regional', 'regionaloperacional', 'areaoperacional', 'polo', 'uf'), shift: firstColumn(headers, 'turno', 'jornada', 'periodo'),
+      activity: firstColumn(headers, 'atividade', 'atividadeoperacional', 'tipoatividade', 'tipodeatividade', 'funcao', 'servico', 'operacao'), teamClass: firstColumn(headers, 'classe', 'classeequipe', 'classedeequipe', 'equipe', 'tipodeequipe'),
+      current: firstColumn(headers, 'hcatual', 'headcountatual', 'quantidadeatual', 'quantidadehc', 'qtdhc', 'qtdcolaboradores', 'equipeatual', 'headcount', 'hc'), required: firstColumn(headers, 'hcrequerido', 'headcountrequerido', 'headcountnecessario', 'hcdemandado', 'hcideal', 'necessidadehc', 'qtdnecessaria', 'requerido', 'necessario'),
+      capacity: firstColumn(headers, 'capacidadeporhc', 'capacidadeporpessoa', 'capacidade', 'producao'), sla: firstColumn(headers, 'sla', 'slaalvo'), safety: firstColumn(headers, 'margemseguranca', 'margemdeseguranca'),
       monthlyCost: firstColumn(headers, 'customensal', 'custototalmensal', 'custoequipe', 'custototal'), unitCost: firstColumn(headers, 'custoporhc', 'custounitario', 'custoporheadcount', 'valorunitario'),
       teamCount: firstColumn(headers, 'quantidadedeequipes', 'numeroequipes', 'equipes'), teamUnitCost: firstColumn(headers, 'custoporequipe', 'valorporequipe'),
       movement: firstColumn(headers, 'movimentoalocado', 'hcmovimento', 'quantidademovimentada'), source: firstColumn(headers, 'fonte', 'source', 'origem'), validity: firstColumn(headers, 'vigencia', 'validade', 'versao'),
@@ -190,9 +206,9 @@ export function parseOperationalWorkbook(sheets, currentOperations) {
 
 export function parseDimensionSheet(rows, { sheetName = 'Operação', fileName = 'Planilha importada', slaTarget = 95, safetyBuffer = 0 } = {}) {
   const aliases = {
-    region: ['regiao', 'regional', 'uf'], shift: ['turno', 'jornada'], activity: ['atividade', 'funcao', 'operacao'],
-    teamClass: ['classe', 'classeequipe', 'classedeequipe', 'equipe', 'tipodeequipe'], current: ['hcatual', 'headcountatual', 'atual', 'hc', 'quantidadehc'],
-    required: ['hcrequerido', 'headcountrequerido', 'requerido', 'necessario'], capacity: ['capacidadeporhc', 'capacidade', 'producao'],
+    region: ['regiao', 'regional', 'regionaloperacional', 'areaoperacional', 'polo', 'uf'], shift: ['turno', 'jornada', 'periodo'], activity: ['atividade', 'atividadeoperacional', 'tipoatividade', 'tipodeatividade', 'funcao', 'servico', 'operacao'],
+    teamClass: ['classe', 'classeequipe', 'classedeequipe', 'equipe', 'tipodeequipe'], current: ['hcatual', 'headcountatual', 'quantidadeatual', 'atual', 'qtdhc', 'qtdcolaboradores', 'equipeatual', 'hc', 'quantidadehc'],
+    required: ['hcrequerido', 'headcountrequerido', 'headcountnecessario', 'hcdemandado', 'hcideal', 'necessidadehc', 'qtdnecessaria', 'requerido', 'necessario'], capacity: ['capacidadeporhc', 'capacidadeporpessoa', 'capacidade', 'producao'],
     movement: ['movimentoalocado', 'hcmovimento', 'quantidademovimentada'], sla: ['sla', 'slaalvo'], safety: ['margemseguranca', 'margemdeseguranca'], source: ['fonte', 'source', 'origem'], validity: ['vigencia', 'validade', 'versao'],
   };
   const headerRowIndex = rows.findIndex((row) => {
