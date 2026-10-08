@@ -1,7 +1,7 @@
 # Acesso e contas do T-Sim
 
 **Atualizado:** 08/10/2026  
-**Estado:** portal, API server-side e migração implementados; variáveis Supabase e Gmail já configuradas na Vercel. A ativação depende da publicação do código e do provisionamento do primeiro administrador.
+**Estado:** deploy de produção pronto em `https://t-sim.vercel.app`; variáveis Supabase e Gmail já configuradas na Vercel. Falta provisionar o primeiro administrador para liberar a gestão das solicitações.
 
 ## Fluxo
 
@@ -14,7 +14,7 @@
 ## Implementação
 
 - `api/access` contém as funções Vercel para sessão, login, logout, cadastro, decisões administrativas, reenvio de e-mail e provisionamento inicial do admin.
-- `supabase/migrations/20261008213727_access_accounts_and_rate_limits.sql` cria perfis, auditoria, tabela de limites e funções RPC. RLS está ativo; apenas o papel server-side pode acessar os registros.
+- `supabase/migrations/20261008225200_access_accounts_and_rate_limits.sql` cria perfis, auditoria, tabela de limites e funções RPC. RLS está ativo; apenas o papel server-side pode acessar os registros.
 - Sessões usam cookie `HttpOnly`, `SameSite=Strict`, `Secure` em produção e criptografia AES-256-GCM. A API confere no banco se a conta continua aprovada.
 - A matrícula é convertida em um endereço sintético interno para a autenticação do Supabase. E-mails de contato ficam separados e recebem as notificações do produto.
 - Limites de tentativas são aplicados no banco: até cinco logins por matrícula a cada 15 minutos, além de limite por origem; cadastro também tem limite por origem e matrícula.
@@ -24,7 +24,7 @@
 
 ## Pendências de infraestrutura
 
-O projeto Supabase `T-SIM` (`izancfemcwtkoykwskgf`) está ativo em `sa-east-1`, e a migração de contas está aplicada. A Vercel já tem `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `TSIM_SESSION_ENCRYPTION_KEY`, `PUBLIC_APP_URL`, `GMAIL_SMTP_USER` e `GMAIL_APP_PASSWORD` nos ambientes Production, Preview e Development. `SUPABASE_SECRET_KEY` está em Production e Preview; adicione Development apenas para executar localmente com `vercel dev`. O código do portal/Gmail permanece no workspace e ainda precisa ser publicado. As variáveis de bootstrap do administrador ainda precisam ser definidas e usadas uma única vez.
+O projeto Supabase `T-SIM` (`izancfemcwtkoykwskgf`) está ativo em `sa-east-1`, e a migração de contas está aplicada. A Vercel já tem `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `TSIM_SESSION_ENCRYPTION_KEY`, `PUBLIC_APP_URL`, `GMAIL_SMTP_USER` e `GMAIL_APP_PASSWORD` nos ambientes Production, Preview e Development. `SUPABASE_SECRET_KEY` está em Production e Preview; adicione Development apenas para executar localmente com `vercel dev`. O commit `c081a0e` foi publicado na branch `main`; o deploy de produção está `READY` e associado ao domínio `t-sim.vercel.app`. As variáveis de bootstrap do administrador ainda precisam ser definidas e usadas uma única vez.
 
 ### Variáveis privadas na Vercel
 
@@ -48,12 +48,35 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'
 
 ### Ativação restante
 
-1. Ative a verificação em duas etapas da conta Google e crie uma senha de app para o T-Sim. Salve-a como `GMAIL_APP_PASSWORD` na Vercel, nos ambientes necessários. Não use nem compartilhe a senha normal do Gmail.
-2. Publique o código local no repositório conectado à Vercel e aguarde um deploy concluído.
-3. Defina `TSIM_ADMIN_REGISTRATION`, `TSIM_ADMIN_PIN` (seis dígitos) e `TSIM_ADMIN_BOOTSTRAP_SECRET` como variáveis sensíveis na Vercel. Chame uma vez `POST /api/access/bootstrap-admin` com o cabeçalho `x-tsim-bootstrap-secret` contendo o segredo configurado. A matrícula e o PIN viram as credenciais de login administrativo; o contato da conta será `tconnectsuporte@gmail.com`.
-4. Após receber `{ "status": "created" }`, remova `TSIM_ADMIN_BOOTSTRAP_SECRET` e `TSIM_ADMIN_PIN` da Vercel e faça novo deploy.
-5. Teste solicitação, recebimento da notificação no Gmail, aprovação, negativa, resposta ao e-mail e logout em um deploy de preview.
+1. Na Vercel, abra **t-sim → Settings → Environment Variables** e crie as três variáveis abaixo para **Production**. Escolha a matrícula administrativa e um PIN inicial de seis dígitos. Não envie esses valores por chat.
+2. Gere um segredo de bootstrap no PowerShell com `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`. Salve-o num gerenciador de senhas e adicione-o à Vercel como variável sensível.
+3. Faça um novo deploy de produção para as variáveis chegarem às funções.
+4. Execute o bloco PowerShell abaixo e cole o segredo quando solicitado. Ele não será exibido na tela.
+5. A resposta esperada é `{ "status": "created", ... }`. Se receber erro, confira os nomes e ambientes das variáveis antes de tentar novamente.
+6. Remova `TSIM_ADMIN_BOOTSTRAP_SECRET` e `TSIM_ADMIN_PIN` da Vercel e faça outro deploy. Mantenha `TSIM_ADMIN_REGISTRATION` se desejar; ela não é usada no login após a criação da conta.
+7. Entre em `https://t-sim.vercel.app` com matrícula e PIN. Teste uma solicitação de acesso e confirme que a notificação chegou ao Gmail.
 
+Variáveis para criar em Production:
+
+- `TSIM_ADMIN_REGISTRATION`: matrícula escolhida para a conta administrativa.
+- `TSIM_ADMIN_PIN`: PIN numérico inicial de seis dígitos.
+- `TSIM_ADMIN_BOOTSTRAP_SECRET`: segredo aleatório com pelo menos 32 caracteres, criado no PowerShell.
+
+Provisionamento pelo PowerShell:
+
+```powershell
+$secret = Read-Host 'Cole o segredo de bootstrap da Vercel' -AsSecureString
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
+try {
+  $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+  Invoke-RestMethod -Method Post `
+    -Uri 'https://t-sim.vercel.app/api/access/bootstrap-admin' `
+    -Headers @{ 'x-tsim-bootstrap-secret' = $plain; Origin = 'https://t-sim.vercel.app' }
+} finally {
+  if ($ptr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
+  Remove-Variable plain, secret -ErrorAction SilentlyContinue
+}
+```
 O SMTP usa `smtp.gmail.com` na porta 465 com TLS. O Gmail exige uma senha de app, disponível para contas com verificação em duas etapas e sujeita às restrições da conta Google. Não use a senha normal da conta. As funções aguardam o envio e têm timeouts de conexão para concluir a mensagem dentro da execução serverless.
 
 O Vite (`pnpm dev`) serve a interface, mas não executa funções Vercel. Para executar interface e API localmente, use `vercel dev` com as mesmas variáveis em ambiente protegido.
