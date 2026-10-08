@@ -68,6 +68,10 @@ export const operationalSource = {
   name: 'Cópia de Custos e Preço V3 ABR/2025 · Encargos atualizados',
   version: 'Abr/2025',
   owner: 'Controladoria / Operações',
+  confirmedAt: '08/10/2026',
+  confirmedBy: 'Responsável do projeto',
+  confirmationNote: 'Valores da referência Abr/2025 e base de 672 HC confirmados como válidos pelo responsável em 08/10/2026. A data original da fonte permanece Abr/2025.',
+  basisSource: 'Cópia de Custos e Preço V3 · Custos Equipes',
   headcountBases: [
     { id: 'custos-equipes', label: 'Custos Equipes · oficial', headcount: 672, basis: 'Distribuição orçada da aba Custos Equipes', classification: 'Informada' },
     { id: 'controle-local', label: 'Controle Local FTTH · comparação', headcount: 609, basis: 'Base alternativa da aba Controle Local', classification: 'Informada' },

@@ -110,7 +110,13 @@ export function loadConfiguration(defaults) {
     const cargoMap = new Map((parsed.cargos ?? []).map((cargo) => [cargo.id, cargo]));
     return {
       encargos: Number.isFinite(parsed.encargos) ? parsed.encargos : defaults.encargos,
-      cargos: defaults.cargos.map((cargo) => ({ ...cargo, ...cargoMap.get(cargo.id) })),
+      cargos: defaults.cargos.map((cargo) => {
+        const savedCargo = cargoMap.get(cargo.id);
+        const merged = { ...cargo, ...savedCargo };
+        const isUnchangedSeed = savedCargo?.salary === cargo.salary && savedCargo?.source === cargo.source;
+        if (isUnchangedSeed && savedCargo?.validity === 'Vigência a confirmar') merged.validity = cargo.validity;
+        return merged;
+      }),
     };
   } catch {
     return defaults;

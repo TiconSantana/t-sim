@@ -341,7 +341,11 @@ O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O mod
 
 ## 12. Fechamento da Fase 5 — hardening local
 
-**Atualizado:** 07/10/2026
+**Atualizado:** 08/10/2026
+
+- O responsável confirmou em 08/10/2026 que os seis salários de referência, os encargos de 113%, a base oficial de 672 HC e os valores operacionais da fonte de abril/2025 continuam válidos. A confirmação foi registrada separadamente da vigência original: a versão/data da fonte operacional continua `Abr/2025`; isso não altera o rateio ainda ausente por turno e atividade.
+- A tela identifica os salários pela fonte de análise gerencial e a data da confirmação, sem atribuí-los a “RH / Controladoria” ou chamar a vigência de atual sem evidência. Configurações locais existentes que mantinham a mesma grade seed recebem a data confirmada ao carregar; valores salariais alterados/importados não são reclassificados automaticamente.
+- Analytics e Budget informam a confirmação dos custos e do headcount da fonte operacional, mantendo a data original de abril/2025 visível. A confirmação de valores não valida cobertura por região, turno e atividade nem autoriza aprovação quando o rateio estiver pendente.
 
 - A suíte `pnpm test` contém 21 verificações e passou integralmente neste ciclo. Inclui limites financeiros, promoção manual acima do automático, elegibilidade, cobertura, importações Excel e restauração do histórico.
 - A dependência Excel vulnerável `xlsx@0.18.5` foi substituída pelo espelho npm comunitário `@e965/xlsx@0.20.3`, que publica a versão corrigida do SheetJS. `pnpm audit --prod` não reporta vulnerabilidades conhecidas após a troca; a instalação está fixada na versão usada.
@@ -349,7 +353,7 @@ O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O mod
 - O importador `.xlsx` reconhece nomes alternativos comuns para cargos, região, período/turno, atividade, headcount e capacidade; também interpreta valores textuais em formatos numéricos brasileiros e norte-americanos.
 - Os formatos de cargos dos anexos `Ferramenta_Planejamento_Promocoes` (Cadastro de Cargos com coluna `Salário Base (R$)`) e `Simulador_Promocoes_Tecnicos` (pares Cargo/Salário de origem e destino) agora são reconhecidos. Divergências de salário para o mesmo cargo são ignoradas e reportadas na mensagem da importação para revisão humana.
 - O backup Excel cobre Cargos, Pessoas, Premissas, Operação, Custos, Headcount, Cenários e Histórico. A importação continua restrita ao formato `.xlsx`.
-- No build de produção, o JavaScript inicial ficou em 361,53 KB (104,95 KB gzip). A biblioteca Excel é emitida como chunk separado de 492,27 KB (160,41 KB gzip) e é importada sob demanda em operações de arquivo; não é parte do carregamento inicial.
+- No build de produção deste ciclo, o JavaScript inicial ficou em 362,82 KB (105,35 KB gzip). A biblioteca Excel é emitida como chunk separado de 492,27 KB (160,41 KB gzip) e é importada sob demanda em operações de arquivo; não é parte do carregamento inicial.
 - Os avisos de build sobre `use client` vêm de `lucide-react` e não impedem a compilação.
 
 ### Itens deliberadamente fora desta entrega
