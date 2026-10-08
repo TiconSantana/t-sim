@@ -10,8 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.117.3",
     "@vitejs/plugin-react": "latest",
     "lucide-react": "latest",
+    "nodemailer": "10.0.16",
     "react": "latest",
     "react-dom": "latest",
     "vite": "latest",

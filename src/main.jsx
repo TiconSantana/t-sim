@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Activity,
@@ -18,6 +18,7 @@ import {
   Gauge,
   LineChart,
   Layers3,
+  LogOut,
   Menu,
   Moon,
   Plus,
@@ -27,6 +28,8 @@ import {
   Settings,
   Sun,
   TriangleAlert,
+  UserCheck,
+  UserX,
   UsersRound,
   X,
 } from 'lucide-react';
@@ -49,7 +52,8 @@ const navItems = [
   { id: 'budget', label: 'Budget', icon: DollarSign },
   { id: 'analytics', label: 'Analytics', icon: LineChart },
   { id: 'ai', label: 'T-Sim AI', icon: Sparkles },
-  { id: 'settings', label: 'Configurações', icon: Settings },
+  { id: 'settings', label: 'Configuração de Ambiente', icon: Settings },
+  { id: 'accounts', label: 'Contas de acesso', icon: UsersRound, adminOnly: true },
 ];
 
 function money(value, compact = false) {
@@ -199,7 +203,7 @@ function OverviewView({ cargoList, encargos, savedScenarios, onGoSimulator, onGo
   const latest = savedScenarios[0];
   return (
     <>
-      <section className="hero-intro overview-hero"><div><div className="eyebrow"><span className="eyebrow-line" /> VISÃO GERAL</div><h1>Um radar para<br /><em>decidir melhor.</em></h1><p>Uma leitura consolidada da estrutura salarial, dos cenários simulados e dos próximos pontos de validação.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Ambiente local</div><strong>Base T-Sim · Bahia</strong><span>Dados carregados neste navegador</span><button onClick={onGoSimulator}>Abrir simulador <ChevronRight size={14} /></button></div></section>
+      <section className="hero-intro overview-hero"><div><div className="eyebrow"><span className="eyebrow-line" /> VISÃO GERAL</div><h1>Um radar para<br /><em>decidir melhor.</em></h1><p>Uma leitura consolidada da estrutura salarial, dos cenários simulados e dos próximos pontos de validação.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Configuração de Ambiente</div><strong>Base T-Sim · Bahia</strong><span>Dados carregados neste navegador</span><button onClick={onGoSimulator}>Abrir simulador <ChevronRight size={14} /></button></div></section>
       <section className="metric-grid"><Metric label="Custo mensal de referência" value={money(totalMonthly)} detail={`${cargoList.length} cargos · encargos ${formatPercent(encargos)}`} tone="blue" icon={BarChart3} /><Metric label="Cenários salvos" value={savedScenarios.length} detail="simulações reabríveis" tone="green" icon={Layers3} /><Metric label="Último saldo aplicado" value={latest ? money(latest.appliedBalance) : '—'} detail={latest ? latest.name : 'salve uma simulação para acompanhar'} tone={latest && latest.appliedBalance < 0 ? 'orange' : 'violet'} icon={latest && latest.appliedBalance < 0 ? ArrowUpRight : Check} /><Metric label="Premissas rastreadas" value="100%" detail="fonte e classificação na tela" tone="orange" icon={ClipboardCheck} /></section>
       <section className="overview-grid"><div className="panel-surface overview-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Fluxo recomendado</h2><p>Próximas ações para fechar uma decisão</p></div></div></div><div className="overview-flow"><button onClick={onGoPeople}><span>01</span><strong>Validar cargos</strong><small>Salários e encargos</small><ChevronRight size={15} /></button><button onClick={onGoSimulator}><span>02</span><strong>Simular movimento</strong><small>Economia e promoção</small><ChevronRight size={15} /></button><button onClick={onGoReports}><span>03</span><strong>Preparar aprovação</strong><small>Premissas e parecer</small><ChevronRight size={15} /></button></div></div><div className="panel-surface overview-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Sinais do workspace</h2><p>Leituras rápidas</p></div></div></div><div className="signal-list"><div><span className="signal-icon signal-green"><Check size={14} /></span><div><strong>Grade carregada</strong><small>{cargoList.length} níveis prontos para simulação</small></div></div><div><span className="signal-icon signal-blue"><Layers3 size={14} /></span><div><strong>{savedScenarios.length ? `${savedScenarios.length} cenário salvo` : 'Nenhum cenário salvo'}</strong><small>{savedScenarios.length ? 'Último cenário disponível para reabertura' : 'Comece pelo simulador'}</small></div></div><div><span className="signal-icon signal-orange"><ShieldCheck size={14} /></span><div><strong>Operação ainda precisa de validação</strong><small>Confira cobertura e SLA antes de aprovar</small></div></div></div></div></section>
       <section className="panel-surface overview-panel recent-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Últimas simulações</h2><p>Resumo do que está pronto para continuar</p></div></div><button className="text-action" onClick={onGoReports}>Abrir pareceres <ChevronRight size={15} /></button></div>{savedScenarios.length === 0 ? <div className="overview-empty">Nenhuma simulação salva. <button onClick={onGoSimulator}>Abrir o simulador</button></div> : <div className="recent-scenarios">{savedScenarios.slice(0, 4).map((scenario) => <div className="recent-scenario" key={scenario.id}><div><strong>{scenario.name}</strong><span>{scenario.quantity} posição{scenario.quantity === 1 ? '' : 'ões'} · {scenario.appliedPromotions} promoç{scenario.appliedPromotions === 1 ? 'ão' : 'ões'}</span></div><strong className={scenario.appliedBalance < 0 ? 'negative-value' : 'positive-value'}>{money(scenario.appliedBalance)}</strong></div>)}</div>}</section>
@@ -450,7 +454,7 @@ function SettingsView({ configuration, operations, savedScenarios, approvals, au
   const [profileName, setProfileName] = useState('');
   async function importWorkbook(event) { const file = event.target.files?.[0]; if (!file) return; try { if (!file.name.toLowerCase().endsWith('.xlsx')) throw new Error('Selecione uma planilha Excel no formato .xlsx.'); const result = await onImportWorkbook(file); const preserved = result.preservedSections?.length ? ` Seções sem registros válidos preservadas no perfil: ${result.preservedSections.join(', ')}.` : ''; const warnings = result.warnings?.length ? ` Atenção: ${result.warnings.join(' ')}` : ''; setMessage(`Planilha importada: ${result.counts.cargos} cargos, ${result.counts.people} pessoas, ${result.counts.assumptions} premissas, ${result.counts.dimensions} dimensões, ${result.counts.costs} custos, ${result.counts.scenarios} cenários e ${result.counts.auditEvents} eventos de histórico.${preserved}${warnings}`); } catch (error) { setMessage(error.message || 'Não foi possível importar a planilha completa.'); } finally { event.target.value = ''; } }
   function createProfile() { const profile = onCreateProfile(profileName); if (profile) { setProfileName(''); setMessage(`Perfil local “${profile.name}” criado.`); } }
-  return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> CONFIGURAÇÕES</div><h1>Controle as<br /><em>premissas locais.</em></h1><p>O T-Sim usa uma base própria por ambiente. Os dados importados ficam disponíveis somente neste navegador e não são enviados a outro sistema.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Ambiente atual</div><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base própria · local'}</strong><span>Dados disponíveis neste aparelho</span><button onClick={() => setMessage('O T-Sim está operando com a base própria local deste navegador.')}>Ver status <ChevronRight size={14} /></button></div></section><section className="settings-grid"><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Base própria e governança</h2><p>Dados carregados pelo usuário</p></div></div></div><div className="settings-list"><div><span>Ambiente</span><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base T-Sim · usuário atual'}</strong></div><div><span>Persistência</span><strong>localStorage · perfil local selecionado</strong></div><div><span>Compartilhamento externo</span><strong>Desativado</strong></div><div><span>Registros importados</span><strong>{people.length} pessoas · {assumptions.length} premissas</strong></div><div><span>Classificação dos resultados</span><strong>Informados, calculados e estimados</strong></div></div><div className="profile-switcher"><label><span>Perfil local</span><select value={activeProfileId} onChange={(event) => onProfileChange(event.target.value)}>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label><div className="profile-create"><input value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Nome da nova base" /><button className="secondary-button" type="button" onClick={createProfile}>Criar perfil</button></div></div><div className="panel-note profile-limit-note"><ShieldCheck size={16} /><span>Perfis são uma organização local, não contas protegidas: qualquer pessoa com acesso a este navegador pode alternar entre eles. Não guarde aqui dados pessoais que exijam controle de acesso.</span></div></div><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Planilha padrão</h2><p>Alimente todas as áreas do seu ambiente</p></div></div></div><div className="settings-actions"><a className="secondary-button" href="/templates/tsim-planilha-padrao.xlsx" download>Baixar planilha padrão</a><input ref={workbookInputRef} hidden type="file" accept=".xlsx" onChange={importWorkbook} /><button className="secondary-button" onClick={() => workbookInputRef.current?.click()}>Importar planilha completa</button><button className="secondary-button" onClick={reset}>Restaurar cargos e encargos</button><button className="secondary-button" onClick={clear}>Limpar dados locais</button></div><div className="settings-backup"><button className="secondary-button" onClick={exportWorkspace}>Exportar backup Excel .xlsx</button><span>Inclui cargos, pessoas, premissas, operação, custos, headcount, cenários e histórico.</span></div>{message && <div className="settings-message"><Check size={15} />{message}</div>}<div className="panel-note"><ShieldCheck size={16} /><span>As abas Cargos, Pessoas, Premissas, Operação e Cenários são processadas localmente. Revise fonte, vigência e cobertura antes de salvar.</span></div></div></section></>;
+  return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> CONFIGURAÇÃO DE AMBIENTE</div><h1>Configure seu<br /><em>ambiente.</em></h1><p>Revise a base de cargos, premissas e operação deste ambiente de trabalho.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Ambiente atual</div><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base própria · local'}</strong><span>Dados disponíveis neste aparelho</span><button onClick={() => setMessage('O T-Sim está operando com a base própria local deste navegador.')}>Ver status <ChevronRight size={14} /></button></div></section><section className="settings-grid"><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Base própria e governança</h2><p>Dados carregados pelo usuário</p></div></div></div><div className="settings-list"><div><span>Ambiente</span><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base T-Sim · usuário atual'}</strong></div><div><span>Persistência</span><strong>localStorage · perfil local selecionado</strong></div><div><span>Compartilhamento externo</span><strong>Desativado</strong></div><div><span>Registros importados</span><strong>{people.length} pessoas · {assumptions.length} premissas</strong></div><div><span>Classificação dos resultados</span><strong>Informados, calculados e estimados</strong></div></div><div className="profile-switcher"><label><span>Perfil local</span><select value={activeProfileId} onChange={(event) => onProfileChange(event.target.value)}>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label><div className="profile-create"><input value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Nome da nova base" /><button className="secondary-button" type="button" onClick={createProfile}>Criar perfil</button></div></div><div className="panel-note profile-limit-note"><ShieldCheck size={16} /><span>Perfis são uma organização local, não contas protegidas: qualquer pessoa com acesso a este navegador pode alternar entre eles. Não guarde aqui dados pessoais que exijam controle de acesso.</span></div></div><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Planilha padrão</h2><p>Alimente todas as áreas do seu ambiente</p></div></div></div><div className="settings-actions"><a className="secondary-button" href="/templates/tsim-planilha-padrao.xlsx" download>Baixar planilha padrão</a><input ref={workbookInputRef} hidden type="file" accept=".xlsx" onChange={importWorkbook} /><button className="secondary-button" onClick={() => workbookInputRef.current?.click()}>Importar planilha completa</button><button className="secondary-button" onClick={reset}>Restaurar cargos e encargos</button><button className="secondary-button" onClick={clear}>Limpar dados locais</button></div><div className="settings-backup"><button className="secondary-button" onClick={exportWorkspace}>Exportar backup Excel .xlsx</button><span>Inclui cargos, pessoas, premissas, operação, custos, headcount, cenários e histórico.</span></div>{message && <div className="settings-message"><Check size={15} />{message}</div>}<div className="panel-note"><ShieldCheck size={16} /><span>As abas Cargos, Pessoas, Premissas, Operação e Cenários são processadas localmente. Revise fonte, vigência e cobertura antes de salvar.</span></div></div></section></>;
 }
 function AiView({ calc, operations }) {
   const coverage = operations.dimensions?.length ? calculateDimensionCoverage(operations.dimensions, 1, operations.allocationMode) : calculateCoverage({ ...operations, quantity: 1 });
@@ -483,43 +487,267 @@ function InstitutionalView({ onGoSimulator }) {
   );
 }
 
-function EntryExperience({ stage, onStageChange, onEnter }) {
-  const onboarding = stage === 'onboarding';
+function EntryExperience({ onEnter }) {
+  const [mode, setMode] = useState('login');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
+  const [credentials, setCredentials] = useState({ registration: '', pin: '' });
+  const [request, setRequest] = useState({ registration: '', fullName: '', email: '', phone: '', company: '', role: '', pin: '', confirmPin: '' });
+  const isRegistration = mode === 'register';
+
+  useEffect(() => {
+    let current = true;
+    fetch('/api/access/session', { credentials: 'same-origin' })
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((session) => {
+        if (current && session?.status === 'approved') onEnter(session.user);
+      })
+      .catch(() => {});
+    return () => { current = false; };
+  }, [onEnter]);
+
+  function updateValue(setter, key, value, numeric = false) {
+    setter((current) => ({ ...current, [key]: numeric ? value.replace(/\D/g, '').slice(0, 6) : value }));
+  }
+
+  async function submitLogin(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    if (!/^\d{6}$/.test(credentials.pin)) {
+      setError('Digite a senha numérica de seis dígitos.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await fetch('/api/access/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registration: credentials.registration.trim(), pin: credentials.pin }),
+      });
+      if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('O serviço de acesso não está conectado. A senha não foi validada.');
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || 'O serviço de acesso não está conectado. A senha não foi validada.');
+      if (result.status === 'pending') {
+        setMode('pending');
+        setMessage('Sua solicitação ainda está em análise. Você receberá a decisão no e-mail informado no cadastro.');
+      } else if (result.status === 'denied') {
+        setError('O acesso não foi aprovado. Consulte o e-mail informado no cadastro para ver a resposta.');
+      } else if (result.status === 'approved') {
+        onEnter(result.user);
+      } else {
+        throw new Error('Não foi possível confirmar o status deste acesso. Tente novamente.');
+      }
+    } catch (submitError) {
+      setError(submitError.message || 'Não foi possível conectar ao serviço de acesso.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitRequest(event) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    if (!/^\d{6}$/.test(request.pin)) {
+      setError('A senha precisa ter exatamente seis números.');
+      return;
+    }
+    if (request.pin !== request.confirmPin) {
+      setError('As senhas não conferem. Revise a confirmação.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const payload = request;
+      const response = await fetch('/api/access/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, registration: payload.registration.trim(), fullName: payload.fullName.trim(), company: payload.company.trim(), role: payload.role.trim() }),
+      });
+      if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('O serviço de cadastro não está conectado. A solicitação não foi enviada.');
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || 'O serviço de cadastro não está conectado. A solicitação não foi enviada.');
+      setRequestSent(true);
+      setMessage(result.message || 'Solicitação enviada. Aguarde a análise da administração.');
+      setMode('pending');
+    } catch (submitError) {
+      setError(submitError.message || 'Não foi possível enviar a solicitação.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <main className="entry-shell">
       <section className="entry-visual">
         <div className="entry-visual-grid" />
-        <img src="/brand/t-sim-lockup-stacked-dark.svg" alt="T-SIM — Decisão inteligente" />
-        <div className="entry-signal"><span /><span /><span /></div>
-        <p>Uma bancada visual para simular pessoas, orçamento e cobertura antes da aprovação.</p>
+        <img src="/brand/t-sim-logo-header.png" alt="T-SIM — Decisão inteligente" />
+        <img className="entry-product-shot" src="/brand/t-sim-app-mockup.png" alt="Representação visual do workspace T-Sim para gestão de pessoas, orçamento e operação" />
+        <div className="entry-visual-copy"><strong>Da solicitação à decisão.</strong><p>Uma trilha de acesso clara antes da equipe abrir a Configuração de Ambiente.</p></div>
+        <ol className="entry-approval-flow" aria-label="Etapas para acessar o T-Sim">
+          <li><span className="flow-state flow-current">1</span><span><strong>Solicitação</strong><small>Dados profissionais e matrícula</small></span></li>
+          <li><span className="flow-state">2</span><span><strong>Análise administrativa</strong><small>Validação de acesso por responsável</small></span></li>
+          <li><span className="flow-state">3</span><span><strong>Configuração de Ambiente</strong><small>Workspace após aprovação</small></span></li>
+        </ol>
+        <div className="entry-visual-meta"><span>PLATAFORMA DE GESTÃO</span><span>t-sim.vercel.app</span></div>
       </section>
       <section className="entry-content">
         <div className="entry-content-inner">
-          <div className="entry-kicker"><span className="eyebrow-line" /> {onboarding ? 'PRIMEIRO ACESSO' : 'ACESSO AO AMBIENTE'}</div>
-          {onboarding ? (
+          <div className="entry-kicker"><span className="eyebrow-line" /> PORTAL DE ACESSO T-SIM</div>
+          {mode === 'pending' ? (
             <>
-              <h1>Prepare a base<br /><em>antes da decisão.</em></h1>
-              <p className="entry-lead">O T-Sim organiza a leitura em três movimentos curtos. Você pode revisar as premissas antes de abrir qualquer cenário.</p>
-              <div className="onboarding-steps">
-                <article><span>01</span><div><strong>Conheça a base</strong><p>Veja cargos, encargos e fontes carregadas.</p></div><Check size={16} /></article>
-                <article><span>02</span><div><strong>Valide as premissas</strong><p>Confirme vigência, origem e classificação.</p></div><ShieldCheck size={16} /></article>
-                <article><span>03</span><div><strong>Simule o movimento</strong><p>Compare economia, promoção e cobertura.</p></div><ArrowRight size={16} /></article>
-              </div>
-              <button className="primary-button entry-submit" type="button" onClick={onEnter}>Abrir workspace <ArrowRight size={16} /></button>
-              <button className="entry-back" type="button" onClick={() => onStageChange('login')}>Voltar ao acesso</button>
+              <div className="entry-status-mark"><ClipboardCheck size={24} /></div>
+              <h1>Acesso em<br /><em>análise.</em></h1>
+              <p className="entry-lead" role="status">{message || 'A administração analisará seus dados e enviará a decisão para o e-mail informado.'}</p>
+              {requestSent && <div className="entry-detail-line"><ShieldCheck size={16} /><span>Não envie sua senha por e-mail. A aprovação libera o acesso com a senha cadastrada.</span></div>}
+              <button className="primary-button entry-submit" type="button" onClick={() => { setMode('login'); setError(''); setMessage(''); }}>Voltar ao login <ArrowRight size={16} /></button>
+            </>
+          ) : isRegistration ? (
+            <>
+              <h1>Solicite seu<br /><em>acesso.</em></h1>
+              <p className="entry-lead">Informe seus dados profissionais. A administração revisará a solicitação antes de liberar a conta.</p>
+              <form className="access-form register-form" onSubmit={submitRequest}>
+                <div className="access-form-grid">
+                  <label className="entry-field"><span>Matrícula</span><input autoComplete="username" value={request.registration} onChange={(event) => updateValue(setRequest, 'registration', event.target.value)} required maxLength={40} /></label>
+                  <label className="entry-field"><span>Nome completo</span><input autoComplete="name" value={request.fullName} onChange={(event) => updateValue(setRequest, 'fullName', event.target.value)} required maxLength={120} /></label>
+                  <label className="entry-field"><span>E-mail para contato</span><input type="email" autoComplete="email" value={request.email} onChange={(event) => updateValue(setRequest, 'email', event.target.value)} required maxLength={254} /></label>
+                  <label className="entry-field"><span>Telefone de contato</span><input type="tel" autoComplete="tel" value={request.phone} onChange={(event) => updateValue(setRequest, 'phone', event.target.value)} required maxLength={30} /></label>
+                  <label className="entry-field"><span>Empresa</span><input autoComplete="organization" value={request.company} onChange={(event) => updateValue(setRequest, 'company', event.target.value)} required maxLength={120} /></label>
+                  <label className="entry-field"><span>Cargo / função</span><input autoComplete="organization-title" value={request.role} onChange={(event) => updateValue(setRequest, 'role', event.target.value)} required maxLength={120} /></label>
+                  <label className="entry-field"><span>Senha numérica · 6 dígitos</span><input type="password" inputMode="numeric" pattern="[0-9]{6}" autoComplete="new-password" value={request.pin} onChange={(event) => updateValue(setRequest, 'pin', event.target.value, true)} required aria-describedby="pin-guidance" /></label>
+                  <label className="entry-field"><span>Confirmar senha</span><input type="password" inputMode="numeric" pattern="[0-9]{6}" autoComplete="new-password" value={request.confirmPin} onChange={(event) => updateValue(setRequest, 'confirmPin', event.target.value, true)} required /></label>
+                </div>
+                <small className="pin-guidance" id="pin-guidance">Use somente números. A administração nunca receberá sua senha.</small>
+                {error && <div className="access-feedback is-error" role="alert">{error}</div>}
+                <button className="primary-button entry-submit" type="submit" disabled={busy}>{busy ? 'Enviando solicitação…' : 'Enviar para análise'} <ArrowRight size={16} /></button>
+              </form>
+              <button className="entry-back" type="button" onClick={() => { setMode('login'); setError(''); }}>Já tenho conta · voltar ao login</button>
             </>
           ) : (
             <>
-              <h1>Entre para<br /><em>decidir melhor.</em></h1>
-              <p className="entry-lead">Acesse a base local do T-Sim e continue suas simulações com as premissas visíveis.</p>
-              <div className="entry-field"><label htmlFor="entry-workspace">Ambiente de trabalho</label><div className="entry-input"><Database size={16} /><input id="entry-workspace" value="Base T-Sim · Bahia" readOnly /></div><small>Ambiente local · dados permanecem neste navegador</small></div>
-              <button className="primary-button entry-submit" type="button" onClick={() => onStageChange('onboarding')}>Continuar <ArrowRight size={16} /></button>
-              <div className="entry-note"><ShieldCheck size={16} /><span>Esta experiência não envia dados para serviços externos e não representa autenticação de produção.</span></div>
+              <h1>Acesse sua<br /><em>gestão.</em></h1>
+              <p className="entry-lead">Entre com sua matrícula e a senha cadastrada. Novas contas precisam ser aprovadas pela administração.</p>
+              <form className="access-form" onSubmit={submitLogin}>
+                <label className="entry-field"><span>Matrícula</span><input autoComplete="username" value={credentials.registration} onChange={(event) => updateValue(setCredentials, 'registration', event.target.value)} required maxLength={40} /></label>
+                <label className="entry-field"><span>Senha numérica · 6 dígitos</span><input type="password" inputMode="numeric" pattern="[0-9]{6}" autoComplete="current-password" value={credentials.pin} onChange={(event) => updateValue(setCredentials, 'pin', event.target.value, true)} required /></label>
+                {error && <div className="access-feedback is-error" role="alert">{error}</div>}
+                <button className="primary-button entry-submit" type="submit" disabled={busy}>{busy ? 'Validando acesso…' : 'Entrar'} <ArrowRight size={16} /></button>
+              </form>
+              <div className="entry-switch"><span>Primeiro acesso?</span><button type="button" onClick={() => { setMode('register'); setError(''); }}>Solicitar cadastro</button></div>
+              <div className="entry-note"><ShieldCheck size={16} /><span>O acesso é liberado após validação administrativa. Em caso de dúvida, fale com tconnectsuporte@gmail.com.</span></div>
             </>
           )}
         </div>
       </section>
     </main>
+  );
+}
+
+function AccessManagementView() {
+  const [requests, setRequests] = useState([]);
+  const [failedNotifications, setFailedNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [busyId, setBusyId] = useState('');
+  const [reasonById, setReasonById] = useState({});
+  const [feedback, setFeedback] = useState('');
+
+  async function loadRequests() {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch('/api/access/requests?status=pending', { credentials: 'same-origin' });
+      if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('A gestão de contas ainda não está conectada ao backend.');
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Não foi possível carregar as solicitações pendentes.');
+      setRequests(Array.isArray(result.requests) ? result.requests : []);
+      setFailedNotifications(Array.isArray(result.failedNotifications) ? result.failedNotifications : []);
+    } catch (loadError) {
+      setError(loadError.message || 'Não foi possível carregar as solicitações.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { loadRequests(); }, []);
+
+  async function reviewRequest(request, decision) {
+    const reason = String(reasonById[request.id] || '').trim();
+    if (decision === 'denied' && !reason) {
+      setError('Informe o motivo para negar esta solicitação.');
+      return;
+    }
+    setBusyId(request.id);
+    setError('');
+    setFeedback('');
+    try {
+      const response = await fetch(`/api/access/requests/${encodeURIComponent(request.id)}/review`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision, reason }),
+      });
+      if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('A decisão não foi enviada: a gestão de contas ainda não está conectada.');
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Não foi possível registrar a decisão.');
+      setRequests((current) => current.filter((item) => item.id !== request.id));
+      setFeedback(result.message || (decision === 'approved' ? 'Acesso aprovado.' : 'Solicitação negada.'));
+      await loadRequests();
+    } catch (reviewError) {
+      setError(reviewError.message || 'Não foi possível registrar a decisão.');
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  async function retryNotification(notification) {
+    setBusyId(`${notification.id}:${notification.kind}`);
+    setError('');
+    setFeedback('');
+    try {
+      const response = await fetch(`/api/access/requests/${encodeURIComponent(notification.id)}/notify`, {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: notification.kind }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || 'Não foi possível reenviar o e-mail.');
+      setFeedback(result.message || 'E-mail reenviado com sucesso.');
+      await loadRequests();
+    } catch (retryError) {
+      setError(retryError.message || 'Não foi possível reenviar o e-mail.');
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  return (
+    <>
+      <section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> ADMINISTRAÇÃO DE ACESSO</div><h1>Revise quem<br /><em>pode entrar.</em></h1><p>Confira os dados profissionais e registre a decisão de acesso. Aprovações e negativas devem gerar uma resposta para o e-mail cadastrado.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Aprovação administrativa</div><strong>{requests.length} solicitação{requests.length === 1 ? '' : 'ões'} pendente{requests.length === 1 ? '' : 's'}</strong><span>Decisões vinculadas à conta administrativa</span><button type="button" onClick={loadRequests}>Atualizar fila <ChevronRight size={14} /></button></div></section>
+      <section className="panel-surface access-admin-panel">
+        <div className="panel-heading compact"><div><div><h2>Solicitações de cadastro</h2><p>Matrícula, contato e vínculo profissional enviados pela pessoa.</p></div></div><span className="admin-queue-status"><span /> Aguardando análise</span></div>
+        {error && <div className="access-feedback is-error" role="alert">{error}</div>}
+        {feedback && <div className="access-admin-feedback" role="status"><UserCheck size={16} />{feedback}</div>}
+        {loading ? <div className="access-admin-empty" role="status">Carregando solicitações…</div>
+          : requests.length === 0 && !error ? <div className="access-admin-empty"><strong>Fila sem pendências</strong><span>Novos cadastros aparecerão aqui depois que o serviço de acesso estiver conectado.</span></div>
+            : requests.length > 0 && <div className="access-requests-list">{requests.map((request) => <article className="access-request-row" key={request.id}>
+              <div className="access-request-identity"><span>Matrícula {request.registration}</span><strong>{request.fullName}</strong><small>{request.company} · {request.role}</small></div>
+              <div className="access-request-contact"><span>{request.email}</span><span>{request.phone}</span><small>Solicitado {request.createdAt ? new Date(request.createdAt).toLocaleDateString('pt-BR') : '—'}</small></div>
+              <label className="access-denial-reason"><span>Motivo para negar (se aplicável)</span><input value={reasonById[request.id] || ''} maxLength={300} onChange={(event) => setReasonById((current) => ({ ...current, [request.id]: event.target.value }))} placeholder="Explique a decisão para a pessoa" /></label>
+              <div className="access-request-actions"><button type="button" className="secondary-button" disabled={Boolean(busyId)} onClick={() => reviewRequest(request, 'denied')}><UserX size={15} /> Negar</button><button type="button" className="primary-button" disabled={Boolean(busyId)} onClick={() => reviewRequest(request, 'approved')}>{busyId === request.id ? 'Registrando…' : 'Aprovar acesso'} <UserCheck size={15} /></button></div>
+            </article>)}</div>}
+        {failedNotifications.length > 0 && <section className="access-mail-retries" aria-labelledby="access-mail-retries-title">
+          <div><h3 id="access-mail-retries-title">E-mails pendentes</h3><p>Falhas ficam registradas para reenvio após ajustar o provedor de e-mail.</p></div>
+          {failedNotifications.map((notice) => <article className="access-failed-notice" key={`${notice.id}:${notice.kind}`}>
+            <div><strong>{notice.fullName}</strong><span>{notice.kind === 'initial' ? 'Aviso para a administração' : `Decisão ${notice.accessStatus === 'approved' ? 'aprovada' : 'negada'} para a pessoa`}</span><small>{notice.email} · matrícula {notice.registration}</small></div>
+            <button type="button" className="secondary-button" disabled={Boolean(busyId)} onClick={() => retryNotification(notice)}>{busyId === `${notice.id}:${notice.kind}` ? 'Reenviando…' : 'Reenviar e-mail'} <ArrowRight size={14} /></button>
+          </article>)}
+        </section>}
+        <div className="panel-note access-admin-security"><ShieldCheck size={16} /><span>Somente uma sessão administrativa pode listar ou decidir solicitações. Senhas e PINs nunca aparecem na fila nem são enviados por e-mail.</span></div>
+      </section>
+    </>
   );
 }
 
@@ -539,8 +767,8 @@ function App() {
   const [showAssumptions, setShowAssumptions] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [activeView, setActiveView] = useState('overview');
-  // O ambiente local abre direto no workspace, sem login ou sincronização externa.
-  const [entryStage, setEntryStage] = useState('workspace');
+  const [entryStage, setEntryStage] = useState('login');
+  const [account, setAccount] = useState(null);
   const [savedScenarios, setSavedScenarios] = useState(() => loadSavedScenarios());
   const [operations, setOperations] = useState(() => loadOperations(operationsDefaults));
   const [approvals, setApprovals] = useState(() => loadApprovals());
@@ -555,11 +783,18 @@ function App() {
     window.localStorage.setItem('tsim.theme.v1', theme);
   }, [theme]);
 
-  const enterWorkspace = () => {
-    window.localStorage.setItem('tsim.onboarding.v1', 'completed');
+  const enterWorkspace = useCallback((user) => {
+    setAccount(user || null);
     setEntryStage('workspace');
-    setActiveView('overview');
-  };
+    setActiveView('settings');
+  }, []);
+
+  async function handleLogout() {
+    try { await fetch('/api/access/logout', { method: 'POST', credentials: 'same-origin' }); } catch { /* encerra o estado visível mesmo sem backend */ }
+    setAccount(null);
+    setActiveView('settings');
+    setEntryStage('login');
+  }
 
   const calc = useMemo(() => calculateSimulation({
     dismissedRole,
@@ -736,6 +971,7 @@ function App() {
   const maxChart = Math.max(...configuredCargos.map((cargo) => custo(cargo, configuredEncargos)));
   const salaryPremise = configuredCargos.find((cargo) => cargo.id === originRole) ?? configuredCargos[0];
   const currentSection = navItems.find((item) => item.id === activeView)?.label || 'Simulador';
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || Boolean(account?.isAdmin));
   const sectionTitle = {
     overview: 'Radar executivo',
     presentation: 'Plataforma e identidade',
@@ -747,11 +983,12 @@ function App() {
     budget: 'Orçamento e folha',
     analytics: 'Custos e indicadores',
     ai: 'Parecer assistido',
-    settings: 'Ambiente local',
+    settings: 'Configuração de Ambiente',
+    accounts: 'Contas de acesso',
   }[activeView];
 
   if (entryStage !== 'workspace') {
-    return <EntryExperience stage={entryStage} onStageChange={setEntryStage} onEnter={enterWorkspace} />;
+    return <EntryExperience onEnter={enterWorkspace} />;
   }
 
   return (
@@ -764,15 +1001,15 @@ function App() {
           <button className="mobile-close" onClick={() => setMobileNav(false)} aria-label="Fechar navegação"><X size={18} /></button>
         </div>
 
-        <button className="workspace-select" type="button" aria-label="Abrir configurações do ambiente" onClick={() => setActiveView('settings')}>
+        <button className="workspace-select" type="button" aria-label="Abrir Configuração de Ambiente" onClick={() => setActiveView('settings')}>
           <div className="workspace-orb">TS</div>
-          <div className="workspace-copy"><span>Ambiente local</span><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base T-Sim · Bahia'}</strong></div>
+          <div className="workspace-copy"><span>Configuração de Ambiente</span><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base T-Sim · Bahia'}</strong></div>
           <ChevronRight size={15} aria-hidden="true" />
         </button>
 
         <nav className="primary-nav" aria-label="Navegação principal">
           <p className="nav-label">Navegação</p>
-          {navItems.map(({ id, label, icon: Icon }) => (
+          {visibleNavItems.map(({ id, label, icon: Icon }) => (
             <button key={label} className={`nav-item ${activeView === id ? 'active' : ''}`} aria-current={activeView === id ? 'page' : undefined} onClick={() => { setActiveView(id); setMobileNav(false); }}>
               <Icon size={17} strokeWidth={activeView === id ? 2.1 : 1.8} aria-hidden="true" />
               <span>{label}</span>
@@ -783,7 +1020,7 @@ function App() {
 
         <div className="sidebar-foot">
           <div className="source-status"><span className="status-dot" /><div><strong>Base local carregada</strong><span>Grade salarial · v1.4</span></div></div>
-          <div className="profile"><div className="avatar">TS</div><div><strong>Usuário atual</strong><span>Base local</span></div><ChevronRight size={15} /></div>
+          <div className="profile"><div className="avatar">{String(account?.fullName || 'TS').trim().split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</div><div><strong>{account?.fullName || 'Usuário atual'}</strong><span>{account?.role || 'Base local'}</span></div>{account && <button type="button" className="profile-logout" onClick={handleLogout} aria-label="Sair da conta"><LogOut size={15} /></button>}</div>
         </div>
       </aside>
 
@@ -797,7 +1034,7 @@ function App() {
         </header>
 
         <div className="content-wrap" id="workspace-content" tabIndex="-1">
-          {activeView === 'people' ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} people={people} onSaveConfiguration={handleSaveConfiguration} onResetConfiguration={handleResetConfiguration} saved={Boolean(window.localStorage.getItem(workspaceStorageKey('tsim.configuration.v1')))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} /> : activeView === 'presentation' ? <InstitutionalView onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'ops' ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} activeProfileName={profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base local'} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' ? <AnalyticsView savedScenarios={savedScenarios} operations={operations} /> : activeView === 'ai' ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' ? <SettingsView configuration={configuration} operations={operations} savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} people={people} assumptions={assumptions} profiles={profiles} activeProfileId={activeProfileId} onProfileChange={handleProfileChange} onCreateProfile={handleCreateProfile} onResetConfiguration={handleResetConfiguration} onClearWorkspace={handleClearWorkspace} onImportWorkbook={handleImportWorkbook} /> : <>
+          {activeView === 'accounts' && account?.isAdmin ? <AccessManagementView /> : activeView === 'people' ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} people={people} onSaveConfiguration={handleSaveConfiguration} onResetConfiguration={handleResetConfiguration} saved={Boolean(window.localStorage.getItem(workspaceStorageKey('tsim.configuration.v1')))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} /> : activeView === 'presentation' ? <InstitutionalView onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'ops' ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} activeProfileName={profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base local'} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' ? <AnalyticsView savedScenarios={savedScenarios} operations={operations} /> : activeView === 'ai' ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' ? <SettingsView configuration={configuration} operations={operations} savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} people={people} assumptions={assumptions} profiles={profiles} activeProfileId={activeProfileId} onProfileChange={handleProfileChange} onCreateProfile={handleCreateProfile} onResetConfiguration={handleResetConfiguration} onClearWorkspace={handleClearWorkspace} onImportWorkbook={handleImportWorkbook} /> : <>
           <section className="hero-intro">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> SIMULADOR DE DECISÃO</div>

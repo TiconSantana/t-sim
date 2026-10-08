@@ -356,8 +356,14 @@ O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O mod
 - No build de produção deste ciclo, o JavaScript inicial ficou em 362,82 KB (105,35 KB gzip). A biblioteca Excel é emitida como chunk separado de 492,27 KB (160,41 KB gzip) e é importada sob demanda em operações de arquivo; não é parte do carregamento inicial.
 - Os avisos de build sobre `use client` vêm de `lucide-react` e não impedem a compilação.
 
-### Itens deliberadamente fora desta entrega
+### Solicitação de acesso — backend implementado em 08/10/2026
 
-A autenticação, permissões por usuário e auditoria persistente em servidor continuam fora do modo local atualmente escolhido. Os dados permanecem no navegador e a transferência entre aparelhos é manual por arquivo Excel. Para habilitar sincronização real entre dispositivos, será necessário reabrir o escopo de backend próprio do T-Sim; essa decisão não será substituída por uma dependência do TConnect.
+- A tela inicial apresenta login por matrícula, solicitação de cadastro e estado de análise; após login aprovado, a primeira seção do workspace é **Configuração de Ambiente**.
+- As funções Vercel implementam login/logout, cadastro pendente, revisão administrativa, reenvio de e-mails e consulta de sessão. A migração Supabase cria perfil de acesso com RLS, rate limits e trilha de auditoria.
+- O projeto Supabase exclusivo `T-SIM` foi criado na organização `TiconSantana2`, e a migração de contas foi aplicada. URL, chave pública, chave de sessão, URL pública, chave secreta (Production e Preview) e credenciais SMTP do Gmail estão configuradas na Vercel. A chave secreta só falta em Development, necessário apenas para `vercel dev`. Ainda faltam publicação do código local e provisionamento seguro do primeiro admin.
+- Até publicar o código e provisionar o primeiro admin, o deploy público ainda não tem autenticação ativa. O workspace atual mantém os dados em `localStorage` por navegador; a autenticação de contas não sincroniza nem protege dados locais de gestão.
+- A senha numérica de seis dígitos solicitada é limitada por tentativas server-side; o backend não persiste o PIN em metadados, tabelas de perfil, auditoria ou e-mail. Uma senha longa ou MFA é recomendada em etapa futura.
+
+As rotas, variáveis, passos de ativação e limites estão documentados em [`ACESSO_E_CONTAS.md`](ACESSO_E_CONTAS.md).
 
 O importador segue preparado para planilhas `.xlsx` com os aliases listados, incluindo as estruturas de cargos e salários de promoção presentes nos anexos do projeto, além das fontes operacionais atualmente reconhecidas. Estruturas novas e específicas de outras empresas ainda precisam ser mapeadas a partir de uma planilha de exemplo.
