@@ -1,7 +1,7 @@
 import {
   ADMIN_EMAIL, AccessError, bodyOf, decisionText, deliverEmail, handleError,
   methodOnly, requestText, requireOrigin, requireSession, sendJson, withVercelWebHandler,
-} from '../../../../server/access.mjs';
+} from '../../../server/access.mjs';
 
 async function handler(req, res) {
   try {

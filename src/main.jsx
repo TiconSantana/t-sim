@@ -653,7 +653,7 @@ function AccessManagementView() {
     setError('');
     setFeedback('');
     try {
-      const response = await fetch(`/api/access/requests/${encodeURIComponent(request.id)}/review`, {
+      const response = await fetch(`/api/access/requests/review?id=${encodeURIComponent(request.id)}`, {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
@@ -677,7 +677,7 @@ function AccessManagementView() {
     setError('');
     setFeedback('');
     try {
-      const response = await fetch(`/api/access/requests/${encodeURIComponent(notification.id)}/notify`, {
+      const response = await fetch(`/api/access/requests/notify?id=${encodeURIComponent(notification.id)}`, {
         method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind: notification.kind }),
       });

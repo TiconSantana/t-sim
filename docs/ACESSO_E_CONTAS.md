@@ -27,7 +27,7 @@
 
 ## Pendências de infraestrutura
 
-O projeto Supabase `T-SIM` (`izancfemcwtkoykwskgf`) está ativo em `sa-east-1`, e a migração de contas está aplicada. A Vercel já tem `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `TSIM_SESSION_ENCRYPTION_KEY`, `PUBLIC_APP_URL`, `GMAIL_SMTP_USER` e `GMAIL_APP_PASSWORD` nos ambientes Production, Preview e Development. `SUPABASE_SECRET_KEY` está em Production e Preview; adicione Development apenas para executar localmente com `vercel dev`. O commit `c081a0e` foi publicado na branch `main`; o deploy de produção está `READY` e associado ao domínio `t-sim.vercel.app`. As variáveis de bootstrap do administrador ainda precisam ser definidas e usadas uma única vez.
+O projeto Supabase `T-SIM` (`izancfemcwtkoykwskgf`) está ativo em `sa-east-1`, e a migração de contas está aplicada. A conta administrativa foi provisionada e autenticou com sucesso. As variáveis de conexão e Gmail estão configuradas na Vercel. O acesso e a fila usam o domínio `t-sim.vercel.app`.
 
 ### Variáveis privadas na Vercel
 
@@ -91,8 +91,8 @@ O Vite (`pnpm dev`) serve a interface, mas não executa funções Vercel. Para e
 - `POST /api/access/login`: autentica matrícula e PIN, aplica limites e cria sessão só para conta aprovada.
 - `POST /api/access/logout`: remove a sessão segura.
 - `GET /api/access/requests?status=pending`: lista pendências e e-mails que precisam de reenvio, apenas para admin.
-- `POST /api/access/requests/{id}/review`: registra aprovação ou negativa e envia a decisão.
-- `POST /api/access/requests/{id}/notify`: reenvia uma notificação marcada como falha, apenas para admin.
+- `POST /api/access/requests/review?id={id}`: registra aprovação ou negativa e envia a decisão.
+- `POST /api/access/requests/notify?id={id}`: reenvia uma notificação marcada como falha, apenas para admin.
 - `POST /api/access/bootstrap-admin`: cria a primeira conta administrativa uma única vez, usando segredo de provisionamento.
 - `GET /api/workspace`: carrega headcount e cenários da própria conta; uma sessão administrativa também pode listar as bases e cenários das contas.
 - `PUT /api/workspace`: salva headcount e cenários da própria conta; somente a sessão administrativa pode gravar a referência salarial global.
