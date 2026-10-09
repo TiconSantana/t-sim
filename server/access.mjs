@@ -27,7 +27,9 @@ export function withVercelWebHandler(handler) {
     const responseHeaders = new Headers();
     const query = Object.fromEntries(url.searchParams.entries());
     const segments = url.pathname.split('/').filter(Boolean);
-    if (['review', 'notify'].includes(segments.at(-1))) query.id = decodeURIComponent(segments.at(-2) || '');
+    if (!query.id && ['review', 'notify'].includes(segments.at(-1)) && segments.at(-2) !== 'requests') {
+      query.id = decodeURIComponent(segments.at(-2) || '');
+    }
     let body;
     let bodyError = false;
     if (!['GET', 'HEAD'].includes(request.method)) {
