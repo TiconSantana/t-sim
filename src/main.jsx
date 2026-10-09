@@ -35,7 +35,7 @@ import {
   X,
 } from 'lucide-react';
 import { cargos, cargoSourceConfirmation, custo, MESES } from './data/cargos';
-import { costAssumptions, operationalCosts, operationalSource, operationsDefaults, teamClasses } from './data/operacao';
+import { costAssumptions, operationalSource, operationsDefaults, teamClasses } from './data/operacao';
 import { calculateSimulation } from './domain/simulation';
 import { calculateCoverage, calculateDimensionCoverage, validateScenarioForApproval } from './domain/operations';
 import { createLocalProfile, getActiveProfileId, loadApprovalHistory, loadApprovals, loadConfiguration, loadImportedAssumptions, loadLocalProfiles, loadOperations, loadPeople, loadSavedScenarios, normalizeOperations, saveApproval, saveApprovalHistory, saveConfiguration, saveImportedAssumptions, saveOperations, setActiveProfile, workspaceStorageKey } from './storage/scenarios';
@@ -76,10 +76,42 @@ function formatPercent(value) {
 }
 
 const metricInfoText = {
-  'Economia mensal': 'Valor liberado no mês pelo desligamento ou vaga aberta. Inclui salário e encargos da posição escolhida.',
-  'Promoções possíveis': 'Quantidade máxima calculada pela economia disponível dividida pelo delta mensal entre o cargo de origem e o destino.',
-  'Saldo do cenário': 'Valor que permanece no mês depois de aplicar as promoções selecionadas. Saldo negativo bloqueia a aprovação.',
-  'ROI estimado': 'Estimativa baseada em três salários do cargo de origem divididos pelo delta mensal da promoção. Não substitui histórico real.',
+  'Pessoas ativas': 'Mostra quantos colaboradores com status ativo foram carregados nesta conta. A fonte é a HEADCOUNT BASE OPERACIONAL ATUAL do próprio ambiente; dados administrativos de outra conta não entram nesta contagem.',
+  'Custo operacional / mês': 'Soma o custo mensal calculado para os colaboradores ativos a partir da grade de cargos e encargos de referência. O valor não usa uma base histórica de headcount sem importação da conta.',
+  'Custo mensal da base': 'Estimativa calculada sobre os colaboradores ativos desta conta, cruzando cargo, salário e encargos da referência administrativa. Cargos sem correspondência ficam pendentes para revisão.',
+  'Cobertura atual': 'Indica a capacidade atual em relação ao headcount requerido e ao SLA configurado. Sem requisito operacional informado, o indicador permanece sem leitura para evitar uma conclusão artificial.',
+  'Cenários para decisão': 'Conta cenários salvos que ainda precisam de revisão, aprovação ou reabertura. O estado vem da trilha de aprovação, enquanto o saldo é conferido no cenário.',
+  'Economia mensal': 'Representa a verba mensal liberada pela movimentação escolhida. O cálculo usa o custo empresa do cargo, incluindo o encargo configurado, e serve de limite para financiar promoções.',
+  'Promoções possíveis': 'É o limite inteiro de promoções que a economia consegue financiar considerando o delta mensal entre os cargos. Elegibilidade e cobertura operacional ainda precisam ser verificadas.',
+  'Saldo do cenário': 'É a diferença entre a economia da movimentação e o custo das promoções aplicadas. Um saldo negativo indica que o cenário consome mais verba do que libera.',
+  'ROI estimado': 'É uma projeção indicativa de retorno da retenção, baseada no multiplicador de substituição e no delta salarial. Não representa histórico confirmado de turnover ou produtividade.',
+  'Cargos cadastrados': 'Quantidade de níveis presentes na referência salarial administrativa usada pelo simulador. A grade é mantida pela conta administradora e aparece para consulta nas contas de usuário.',
+  'Custo mensal total': 'Soma do salário base e dos encargos configurados para cada cargo da grade. Este total representa uma posição de cada nível, não o headcount real da conta.',
+  'Amplitude salarial': 'Compara o salário base do nível mais alto com o do nível inicial da grade. Ajuda a visualizar a distância entre níveis antes de simular uma promoção.',
+  'Premissa de encargos': 'Percentual aplicado sobre o salário base para chegar ao custo empresa. A fonte, vigência e responsável ficam registradas na configuração administrativa.',
+  'Cenários salvos': 'Número de simulações preservadas para reabertura e aprovação. Cada cenário guarda os parâmetros, o resultado calculado e a fotografia das premissas usadas.',
+  'Último movimento': 'Identifica a simulação mais recente salva no ambiente e a data em que ela foi registrada. Use o cenário para revisar a fórmula antes de aprovar.',
+  'Modo manual': 'Mostra quantos cenários alteraram manualmente a quantidade automática de promoções. O ajuste pode reduzir ou ampliar a proposta, mas continua sujeito a bloqueios de verba e cobertura.',
+  'Fonte': 'Indica onde os dados deste perfil são mantidos. Dados locais servem para revisão e transporte; a referência salarial compartilhada continua sob responsabilidade administrativa.',
+  'Headcount atual': 'Soma o headcount informado nas dimensões operacionais da conta. A leitura só representa a base atual quando os dados foram importados ou configurados neste ambiente.',
+  'Headcount requerido': 'Mostra a capacidade de pessoas necessária para as dimensões configuradas. É uma premissa operacional, não uma estimativa criada a partir de uma base histórica.',
+  'Cobertura após movimento': 'Projeta a capacidade depois do desligamento ou movimentação selecionada. A leitura depende de requisito, SLA, capacidade e rateio informados na operação.',
+  'Prontos para revisão': 'Quantidade de cenários com dados suficientes para montar um parecer. Pendências de fonte, cobertura ou validação impedem o envio para aprovação.',
+  'Em aprovação': 'Número de cenários enviados para decisão administrativa e ainda sem aprovação ou negativa registrada.',
+  'Aprovados': 'Número de cenários que receberam decisão aprovada na trilha local de aprovação.',
+  'Formato de saída': 'Formato disponível para transportar o parecer e os dados do cenário. A exportação preserva as premissas e os valores apresentados na tela.',
+  'Folha de referência': 'Custo mensal calculado sobre a grade salarial e os encargos configurados para o cenário. Não representa automaticamente o headcount de outra conta.',
+  'Folha após cenário': 'Custo projetado depois de aplicar desligamentos e promoções no horizonte selecionado. A fórmula fica detalhada no waterfall abaixo.',
+  'Saldo aplicado': 'Verba mensal que sobra depois das movimentações aplicadas no cenário. O valor é usado para bloquear propostas que ultrapassem o orçamento.',
+  'Receita equivalente': 'Receita estimada necessária para compensar o impacto financeiro usando a margem configurada. É uma projeção e depende da validade da margem informada.',
+  'Custo operacional mensal': 'Soma dos custos operacionais importados ou configurados neste ambiente. Sem uma planilha operacional da conta, o painel mostra uma lacuna em vez de aplicar a referência histórica.',
+  'HC base operacional': 'Headcount da base operacional carregada nesta conta. A antiga referência histórica de 672 HC não é aplicada automaticamente.',
+  'HC Controle Local': 'Comparação opcional presente somente quando a planilha operacional da conta traz essa base. Ela não é somada ao headcount principal.',
+  'Cenários disponíveis': 'Quantidade de cenários salvos que podem ser cruzados com a operação atual desta conta.',
+  'Recomendação': 'Classificação do saldo atual segundo as regras do simulador. Ela orienta a revisão e não substitui a aprovação responsável.',
+  'Saldo mensal': 'Valor que permanece depois das promoções aplicadas no cenário atual. Use junto da cobertura e das premissas antes de enviar para decisão.',
+  'Cobertura projetada': 'Percentual de capacidade esperado após o movimento. Quando a operação não tem headcount requerido configurado, a projeção fica sem base suficiente.',
+  'Classificação': 'Classifica o resultado como estimativa quando faltam históricos empresariais para validar ROI, retenção, produtividade ou payback.',
 };
 
 function Metric({ label, value, detail, tone = 'neutral', icon: Icon, info }) {
@@ -90,7 +122,7 @@ function Metric({ label, value, detail, tone = 'neutral', icon: Icon, info }) {
         <span className="metric-topline-actions">
           <details className="metric-info">
             <summary aria-label={`Informações sobre ${label}`} title="Ver explicação"><CircleHelp size={14} strokeWidth={1.8} aria-hidden="true" /></summary>
-            <span className="metric-info-popover" role="tooltip">{info || metricInfoText[label] || `${label}: ${detail}.`}</span>
+            <span className="metric-info-popover" role="tooltip"><strong>Como interpretar</strong><span>{info || metricInfoText[label] || 'Consulte a fonte, fórmula, unidade e classificação exibidas nesta tela antes de tomar uma decisão.'}</span></span>
           </details>
           {Icon && <Icon size={15} strokeWidth={1.8} aria-hidden="true" />}
         </span>
@@ -492,7 +524,7 @@ function InstitutionalView({ onGoSimulator }) {
   );
 }
 
-function EntryExperience({ onEnter, startupError = '' }) {
+function EntryExperience({ onEnter, onLocalReview, startupError = '' }) {
   const [mode, setMode] = useState('login');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -644,6 +676,7 @@ function EntryExperience({ onEnter, startupError = '' }) {
                 <button className="primary-button entry-submit" type="submit" disabled={busy}>{busy ? 'Validando acesso…' : 'Entrar'} <ArrowRight size={16} /></button>
               </form>
               <div className="entry-switch"><span>Primeiro acesso?</span><button type="button" onClick={() => { setMode('register'); setError(''); }}>Solicitar cadastro</button></div>
+              {import.meta.env.DEV && <button className="entry-review-button" type="button" onClick={onLocalReview}>Abrir revisão visual local</button>}
               <div className="entry-note"><ShieldCheck size={16} /><span>O acesso é liberado após validação administrativa. Em caso de dúvida, fale com tconnectsuporte@gmail.com.</span></div>
             </>
           )}
@@ -826,6 +859,13 @@ function App() {
     }
   }, []);
 
+  function enterLocalReview() {
+    setEntryError('');
+    setAccount({ fullName: 'Revisão visual local', registration: 'LOCAL-REVIEW', role: 'Revisor visual', isAdmin: true, localDemo: true });
+    setActiveView('overview');
+    setEntryStage('workspace');
+  }
+
   async function handleLogout() {
     try { await fetch('/api/access/logout', { method: 'POST', credentials: 'same-origin' }); } catch { /* encerra o estado visível mesmo sem backend */ }
     setAccount(null);
@@ -861,7 +901,8 @@ function App() {
       validity: nextConfiguration.cargos[0]?.validity || 'Vigência informada no arquivo de referência',
       version: new Date().toISOString(), responsible: account?.fullName || 'Administrador',
     };
-    return saveAdminReference(reference).then(() => {
+    const saveReference = account?.localDemo ? Promise.resolve() : saveAdminReference(reference);
+    return saveReference.then(() => {
       saveConfiguration(nextConfiguration);
       setConfiguration(nextConfiguration);
       setSalaryReference({ ...reference, updatedAt: new Date().toISOString() });
@@ -920,13 +961,13 @@ function App() {
     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
     const parsed = parseHeadcountRows(rows);
     if (parsed.errors.length) throw new Error(parsed.errors.slice(0, 8).join(' '));
-    await saveAccountWorkspace({ headcount: parsed.records, scenarios: savedScenarios, headcountPlan });
+    if (!account?.localDemo) await saveAccountWorkspace({ headcount: parsed.records, scenarios: savedScenarios, headcountPlan });
     setPeople(parsed.records);
     return { count: parsed.records.length };
   }
 
   async function handleSaveHeadcountPlan(nextPlan) {
-    await saveAccountWorkspace({ headcount: people, scenarios: savedScenarios, headcountPlan: nextPlan });
+    if (!account?.localDemo) await saveAccountWorkspace({ headcount: people, scenarios: savedScenarios, headcountPlan: nextPlan });
     setHeadcountPlan(nextPlan);
   }
 
@@ -967,7 +1008,7 @@ function App() {
     const saved = { id: crypto.randomUUID(), savedAt: new Date().toISOString(), ...snapshotScenario() };
     const nextSavedScenarios = [saved, ...savedScenarios].slice(0, 500);
     try {
-      await saveAccountWorkspace({ headcount: people, scenarios: nextSavedScenarios, headcountPlan });
+      if (!account?.localDemo) await saveAccountWorkspace({ headcount: people, scenarios: nextSavedScenarios, headcountPlan });
       setSavedScenarios(nextSavedScenarios);
       setSaveMessage('Cenário salvo na sua conta.');
     } catch (error) {
@@ -1011,7 +1052,7 @@ function App() {
   }[activeView];
 
   if (entryStage !== 'workspace') {
-    return <EntryExperience onEnter={enterWorkspace} startupError={entryError} />;
+    return <EntryExperience onEnter={enterWorkspace} onLocalReview={enterLocalReview} startupError={entryError} />;
   }
 
   return (
@@ -1053,7 +1094,7 @@ function App() {
         <header className="topbar">
           <button className="menu-trigger" onClick={() => setMobileNav(true)} aria-label="Abrir navegação"><Menu size={21} /></button>
           <div className="breadcrumbs"><span>{currentSection}</span><ChevronRight size={14} /><strong>{sectionTitle}</strong></div>
-          <div className="topbar-actions"><span className="last-sync">{account?.isAdmin ? 'Dados administrativos' : 'Dados da conta'} <strong>{account?.isAdmin ? 'referência no servidor · operações locais' : 'sincronizados no servidor'}</strong></span><button className="theme-toggle" type="button" role="switch" aria-checked={theme === 'dark'} aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'} title={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'} onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}<span>{theme === 'dark' ? 'Claro' : 'Escuro'}</span></button><button className="help-button" aria-label="Ajuda"><CircleHelp size={18} /></button></div>
+          <div className="topbar-actions"><span className="last-sync">{account?.localDemo ? 'Modo de revisão local' : account?.isAdmin ? 'Dados administrativos' : 'Dados da conta'} <strong>{account?.localDemo ? 'sem conexão com API' : account?.isAdmin ? 'referência no servidor · operações locais' : 'sincronizados no servidor'}</strong></span><button className="theme-toggle" type="button" role="switch" aria-checked={theme === 'dark'} aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'} title={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'} onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}<span>{theme === 'dark' ? 'Claro' : 'Escuro'}</span></button><button className="help-button" aria-label="Ajuda"><CircleHelp size={18} /></button></div>
         </header>
 
         <div className="content-wrap" id="workspace-content" tabIndex="-1">

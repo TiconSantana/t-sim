@@ -70,14 +70,14 @@ export const operationalSource = {
   owner: 'Controladoria / Operações',
   confirmedAt: '08/10/2026',
   confirmedBy: 'Responsável do projeto',
-  confirmationNote: 'Valores da referência Abr/2025 e base de 672 HC confirmados como válidos pelo responsável em 08/10/2026. A data original da fonte permanece Abr/2025.',
+  confirmationNote: 'A referência Abr/2025 é histórica e serve apenas para consulta. Ela não define o headcount de nenhuma conta; cada conta deve importar sua própria HEADCOUNT BASE OPERACIONAL ATUAL.',
   basisSource: 'Cópia de Custos e Preço V3 · Custos Equipes',
   headcountBases: [
-    { id: 'custos-equipes', label: 'Custos Equipes · oficial', headcount: 672, basis: 'Distribuição orçada da aba Custos Equipes', classification: 'Informada' },
-    { id: 'controle-local', label: 'Controle Local FTTH · comparação', headcount: 609, basis: 'Base alternativa da aba Controle Local', classification: 'Informada' },
+    { id: 'custos-equipes-historico', label: 'Custos Equipes · referência histórica', headcount: 672, basis: 'Distribuição orçada da aba Custos Equipes', classification: 'Referência histórica' },
+    { id: 'controle-local-historico', label: 'Controle Local FTTH · referência histórica', headcount: 609, basis: 'Base alternativa da aba Controle Local', classification: 'Referência histórica' },
   ],
-  reconciliation: 'Base operacional oficial: 672 HC. Os 609 HC do Controle Local permanecem como comparação e não são somados.',
-  note: 'Valores de custo operacional permanecem separados da simulação simplificada de cargos.',
+  reconciliation: 'As bases de 672 HC e 609 HC permanecem somente como referências históricas e não são aplicadas automaticamente às contas.',
+  note: 'Valores de custo operacional permanecem separados da simulação simplificada de cargos e só entram após importação ou configuração explícita da conta.',
 };
 
 // A fonte informa Bahia e a atividade de operador, mas não apresenta rateio
@@ -104,12 +104,14 @@ export const operationalDimensions = [
 ];
 
 export const operationsDefaults = {
-  teamHeadcount: 672,
-  requiredHeadcount: 672,
+  teamHeadcount: 0,
+  requiredHeadcount: 0,
   slaTarget: 95,
   safetyBuffer: 10,
-  basisId: 'custos-equipes-672',
-  basisVersion: 'Abr/2025',
-  basisSource: 'Cópia de Custos e Preço V3 · Custos Equipes',
-  dimensions: operationalDimensions,
+  basisId: 'account-headcount',
+  basisVersion: null,
+  basisSource: 'Aguardando HEADCOUNT BASE OPERACIONAL ATUAL da conta',
+  dimensions: [],
+  costs: [],
+  headcountBases: [],
 };

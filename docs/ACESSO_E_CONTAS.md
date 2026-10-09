@@ -84,6 +84,11 @@ O SMTP usa `smtp.gmail.com` na porta 465 com TLS. O Gmail exige uma senha de app
 
 O Vite (`pnpm dev`) serve a interface, mas não executa funções Vercel. Para executar interface e API localmente, use `vercel dev` com as mesmas variáveis em ambiente protegido.
 
+Para revisão visual sem credenciais ou conexão externa, o modo de desenvolvimento exibe o botão
+**Abrir revisão visual local** no portal. Ele abre uma sessão administrativa local identificada
+como `Revisão visual local`, mantém as alterações no navegador e não é incluído no build de
+produção. O login real continua dependendo das funções Vercel e do Supabase.
+
 ## Rotas
 
 - `GET /api/access/session`: valida sessão e perfil aprovado.

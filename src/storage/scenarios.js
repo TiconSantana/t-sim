@@ -142,7 +142,7 @@ export function loadOperations(defaults) {
 
 export function normalizeOperations(value, defaults) {
   const merged = { ...defaults, ...(value || {}) };
-  if (value?.basisId !== defaults.basisId) {
+  if (!value || value?.basisId !== defaults.basisId) {
     return {
       ...merged,
       teamHeadcount: defaults.teamHeadcount,
@@ -151,9 +151,16 @@ export function normalizeOperations(value, defaults) {
       basisVersion: defaults.basisVersion,
       basisSource: defaults.basisSource,
       dimensions: defaults.dimensions,
+      costs: defaults.costs,
+      headcountBases: defaults.headcountBases,
     };
   }
-  return { ...merged, dimensions: Array.isArray(merged.dimensions) ? merged.dimensions : defaults.dimensions };
+  return {
+    ...merged,
+    dimensions: Array.isArray(merged.dimensions) ? merged.dimensions : defaults.dimensions,
+    costs: Array.isArray(merged.costs) ? merged.costs : defaults.costs,
+    headcountBases: Array.isArray(merged.headcountBases) ? merged.headcountBases : defaults.headcountBases,
+  };
 }
 
 export function saveOperations(operations) {
