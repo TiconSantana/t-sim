@@ -22,16 +22,16 @@ não recebem os indicadores administrativos.
 | Bloco | Dados | Unidade | Fonte |
 | --- | --- | --- | --- |
 | Pessoas | Pessoas ativas e total importado | HC / pessoas | Headcount da conta |
-| Orçamento | Custos operacionais por contexto | R$ / mês | `operationalCosts` ou importação do perfil |
+| Orçamento | Custos por contexto e custo calculado da base ativa | R$ / mês | Planilha operacional da conta ou cargos/encargos da referência administrativa aplicados ao headcount da conta |
 | Cobertura | HC atual, requerido e meta | HC / % | Configuração de Operação |
 | Decisões | Cenários, saldo e aprovação | R$ / mês / estado | Cenários e aprovações da conta |
 | Cargos | Salário base + encargos | R$ / cargo / mês | Referência salarial versionada |
 
 ## Estados da tela
 
-- **Base carregada:** barras e distribuição por cargo usam somente pessoas ativas.
+- **Base carregada:** barras e distribuição por cargo usam somente pessoas ativas da conta; o custo é calculado com a referência salarial administrativa quando não há custos operacionais importados.
 - **Base vazia:** o painel orienta importar o headcount e não fabrica distribuição.
-- **Cobertura em atenção:** a meta aparece junto ao valor atual e aponta a tela Operação.
+- **Cobertura em atenção:** a meta aparece junto ao valor atual e aponta a tela Operação. Sem headcount requerido configurado, a cobertura fica pendente em vez de assumir 100%.
 - **Sem cenários:** o painel orienta abrir o Simulador.
 - **Dados incompletos:** a nota de rodapé informa que as referências permanecem separadas.
 
@@ -44,6 +44,7 @@ não recebem os indicadores administrativos.
 
 ## Limitações
 
-- O custo operacional continua separado da simulação simplificada de cargos.
+- O custo operacional importado continua separado da simulação simplificada de cargos; na ausência dele, o painel calcula somente o custo dos colaboradores ativos com cargos e encargos administrativos.
+- As referências históricas de 672 HC e 609 HC não são aplicadas automaticamente. Cada conta mantém sua própria HEADCOUNT BASE OPERACIONAL ATUAL.
 - ROI, retenção, produtividade e payback são estimativas até existir histórico validado.
 - A distribuição por cargo depende da importação de headcount e considera somente status ativo.

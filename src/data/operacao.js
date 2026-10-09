@@ -1,5 +1,6 @@
-// Dados de referência extraídos da planilha de custos operacionais V.TAL 2025.
-// Permanecem separados da grade salarial de People para evitar mistura silenciosa de contextos.
+// Dados históricos extraídos da planilha de custos operacionais V.TAL 2025.
+// Permanecem separados da grade salarial de People e nunca são aplicados automaticamente
+// como headcount de uma conta. Só entram após importação ou configuração explícita.
 export const operationalCosts = [
   {
     id: 'campo',

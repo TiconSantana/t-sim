@@ -51,6 +51,14 @@ leitura de valores financeiros e status operacionais.
 - A seleção de colaboradores usa nomes em destaque, matrícula e cargo, caixas de seleção e pesquisa por nome ou matrícula.
 - A lista mantém a seleção mesmo quando o filtro de pesquisa é alterado e respeita o limite calculado de posições.
 
+### Correção de fonte dos indicadores (09/10/2026)
+
+- Popovers dos indicadores agora podem ultrapassar o limite visual do card, têm rolagem própria em textos longos e ficam acima dos cards vizinhos.
+- As explicações informam fonte, fórmula, unidade e interpretação; não repetem apenas o valor exibido.
+- O dashboard não aplica mais automaticamente as referências históricas de 672 HC ou 609 HC.
+- O headcount e o custo da conta usam a HEADCOUNT BASE OPERACIONAL ATUAL carregada no ambiente, cruzada com cargos e encargos administrados.
+- A cobertura permanece pendente até que o headcount requerido e o SLA sejam configurados no ambiente da conta.
+
 ## Limitações conhecidas
 
 - O projeto mantém o modo local sem login, sem sincronização externa e com base isolada por navegador; o deploy público já está ativo.

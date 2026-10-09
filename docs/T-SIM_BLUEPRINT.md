@@ -321,7 +321,7 @@ Ops e Pareceres:
 - Pareceres registra os estados Rascunho, Enviado e Aprovado e exporta um resumo em Excel `.xlsx`.
 - Budget apresenta waterfall da folha e separa as premissas de encargos, ADM, BDI e margem.
 - Analytics apresenta os custos de Campo, Sala Técnica e classes de equipe extraídos da fonte operacional.
-- Analytics e Ops usam 672 HC da aba Custos Equipes como base operacional oficial. Os 609 HC do Controle Local permanecem visíveis apenas como referência comparativa, sem soma automática.
+- Analytics e Ops usam o headcount importado/configurado no ambiente da conta. Os 672 HC da aba Custos Equipes e os 609 HC do Controle Local permanecem apenas como referências históricas dos anexos, sem aplicação automática ou soma entre contas.
 - Ops permite dimensionar linhas por região, turno e atividade, com capacidade por HC, cobertura projetada, fonte, vigência e bloqueio explícito quando o rateio necessário não foi informado.
 - O movimento do cenário pode ser distribuído automaticamente pelo HC de cada dimensão com arredondamento equilibrado, ou alocado manualmente por região/turno/atividade; divergência entre posições simuladas e alocadas bloqueia aprovação.
 - A importação operacional preserva linhas com headcount mas alocação incompleta para correção em tela e informa linhas sem valores de HC que foram ignoradas. A planilha pode fornecer a coluna opcional `Movimento alocado` para iniciar no modo manual.
@@ -343,9 +343,9 @@ O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O mod
 
 **Atualizado:** 08/10/2026
 
-- O responsável confirmou em 08/10/2026 que os seis salários de referência, os encargos de 113%, a base oficial de 672 HC e os valores operacionais da fonte de abril/2025 continuam válidos. A confirmação foi registrada separadamente da vigência original: a versão/data da fonte operacional continua `Abr/2025`; isso não altera o rateio ainda ausente por turno e atividade.
+- Os seis salários de referência e os encargos de 113% continuam como referência administrativa versionada. As bases operacionais de 672 HC e 609 HC dos anexos são históricas e não definem nenhuma conta; cada ambiente precisa importar sua própria HEADCOUNT BASE OPERACIONAL ATUAL. A fonte operacional continua identificada como `Abr/2025` quando um arquivo da conta a utilizar.
 - A tela identifica os salários pela fonte de análise gerencial e a data da confirmação, sem atribuí-los a “RH / Controladoria” ou chamar a vigência de atual sem evidência. Configurações locais existentes que mantinham a mesma grade seed recebem a data confirmada ao carregar; valores salariais alterados/importados não são reclassificados automaticamente.
-- Analytics e Budget informam a confirmação dos custos e do headcount da fonte operacional, mantendo a data original de abril/2025 visível. A confirmação de valores não valida cobertura por região, turno e atividade nem autoriza aprovação quando o rateio estiver pendente.
+- Analytics e Budget mostram a fonte e a vigência do arquivo operacional carregado pela conta. Sem importação, exibem a lacuna e não aplicam as bases históricas dos anexos. A existência de valores não valida cobertura por região, turno e atividade nem autoriza aprovação quando o rateio estiver pendente.
 
 - A suíte `pnpm test` contém 21 verificações e passou integralmente neste ciclo. Inclui limites financeiros, promoção manual acima do automático, elegibilidade, cobertura, importações Excel e restauração do histórico.
 - A dependência Excel vulnerável `xlsx@0.18.5` foi substituída pelo espelho npm comunitário `@e965/xlsx@0.20.3`, que publica a versão corrigida do SheetJS. `pnpm audit --prod` não reporta vulnerabilidades conhecidas após a troca; a instalação está fixada na versão usada.
