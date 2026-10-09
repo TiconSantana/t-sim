@@ -104,7 +104,7 @@ h1 em { color: var(--blue); font-style: normal; }
 .overview-hero .hero-aside button { color: #4cebff; }
 
 .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 11px; margin-bottom: 21px; }
-.metric { min-height: 123px; padding: 16px 17px; background: var(--surface); border: 1px solid var(--ink-100); border-radius: var(--radius-md); box-shadow: 0 5px 15px rgba(20,51,77,.025); position: relative; overflow: hidden; }
+.metric { min-height: 123px; padding: 16px 17px; background: var(--surface); border: 1px solid var(--ink-100); border-radius: var(--radius-md); box-shadow: 0 5px 15px rgba(20,51,77,.025); position: relative; overflow: visible; }
 .metric::before { content: ''; position: absolute; left: 0; top: 0; width: 3px; height: 100%; background: #b4c4cf; }
 .metric-green::before { background: var(--green); }.metric-blue::before { background: var(--blue); }.metric-orange::before { background: var(--orange); }.metric-violet::before { background: var(--violet); }
 .metric-topline { display: flex; justify-content: space-between; align-items: center; color: var(--ink-500); font-size: 11px; }
@@ -180,11 +180,15 @@ h2 { color: var(--ink-900); font-family: 'Space Grotesk', sans-serif; font-size:
 .metric-info summary { display: grid; place-items: center; width: 22px; height: 22px; list-style: none; border: 1px solid transparent; border-radius: 7px; color: var(--ink-500); cursor: help; }
 .metric-info summary::-webkit-details-marker { display: none; }
 .metric-info summary:hover, .metric-info[open] summary { color: var(--blue); border-color: var(--blue); background: var(--surface-muted); }
-.metric-info-popover { position: absolute; right: 0; top: 28px; width: min(265px, 70vw); padding: 11px 12px; border: 1px solid var(--ink-200); border-radius: 9px; color: var(--ink-700); background: var(--surface-raised); box-shadow: 0 13px 35px rgba(4, 25, 45, .18); font-size: 10px; line-height: 1.5; }
+.metric-info-popover { position: absolute; z-index: 40; right: 0; top: 28px; width: min(320px, calc(100vw - 32px)); max-height: min(250px, calc(100vh - 32px)); overflow: auto; padding: 13px 14px; border: 1px solid var(--ink-200); border-radius: 9px; color: var(--ink-700); background: var(--surface-raised); box-shadow: 0 13px 35px rgba(4, 25, 45, .22); font-size: 10px; line-height: 1.55; white-space: normal; }
+.metric-info-popover > strong { display: block; margin-bottom: 5px; color: var(--ink-900); font-size: 10px; }
+.metric-info-popover > span { display: block; }
 .metric-info:hover .metric-info-popover, .metric-info:focus-within .metric-info-popover { opacity: 1; visibility: visible; }
 .metric-info:not([open]) .metric-info-popover { opacity: 0; visibility: hidden; }
 .metric-info:hover:not([open]) .metric-info-popover, .metric-info:focus-within:not([open]) .metric-info-popover { opacity: 1; visibility: visible; }
 .metric-info-popover::before { content: ''; position: absolute; right: 10px; top: -5px; width: 9px; height: 9px; border-top: 1px solid var(--ink-200); border-left: 1px solid var(--ink-200); background: var(--surface-raised); transform: rotate(45deg); }
+.metric:hover, .metric:focus-within, .metric:has(.metric-info[open]) { z-index: 35; }
+.metric-info-popover:focus { outline: 2px solid var(--blue); outline-offset: 2px; }
 .decision-grid-single { grid-template-columns: minmax(0, 1fr); }
 .employee-selection-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
 .employee-selector { min-width: 0; }
@@ -279,6 +283,7 @@ h2 { color: var(--ink-900); font-family: 'Space Grotesk', sans-serif; font-size:
 .executive-empty-inline button { border: 0; padding: 0; color: var(--blue); background: transparent; font-weight: 700; }
 .executive-note { margin-top: 15px; }
 html[data-theme="dark"] .metric-info-popover { box-shadow: 0 18px 42px rgba(0, 0, 0, .4); }
+html[data-theme="dark"] .metric-info-popover > strong { color: var(--ink-950); }
 html[data-theme="dark"] .employee-option:hover, html[data-theme="dark"] .employee-option.is-selected { background: rgba(44, 158, 214, .16); }
 
 @media (max-width: 1120px) {
