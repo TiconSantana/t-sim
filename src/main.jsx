@@ -22,6 +22,7 @@ import {
   Menu,
   Moon,
   Plus,
+  Search,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -41,6 +42,7 @@ import { createLocalProfile, getActiveProfileId, loadApprovalHistory, loadApprov
 import { parseCargoSheet, parseDimensionSheet } from './domain/workbookImport';
 import { parseHeadcountRows } from './domain/headcount';
 import { normalizeHeadcountPlan } from './domain/headcountPlanning';
+import { buildExecutiveDashboard } from './domain/dashboard';
 import UserWorkspaceView from './components/UserWorkspaceView';
 import { loadAccountWorkspace, saveAccountWorkspace, saveAdminReference } from './lib/accountWorkspace';
 import './styles.css';
@@ -73,17 +75,50 @@ function formatPercent(value) {
   return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(value * 100)}%`;
 }
 
-function Metric({ label, value, detail, tone = 'neutral', icon: Icon }) {
+const metricInfoText = {
+  'Economia mensal': 'Valor liberado no mês pelo desligamento ou vaga aberta. Inclui salário e encargos da posição escolhida.',
+  'Promoções possíveis': 'Quantidade máxima calculada pela economia disponível dividida pelo delta mensal entre o cargo de origem e o destino.',
+  'Saldo do cenário': 'Valor que permanece no mês depois de aplicar as promoções selecionadas. Saldo negativo bloqueia a aprovação.',
+  'ROI estimado': 'Estimativa baseada em três salários do cargo de origem divididos pelo delta mensal da promoção. Não substitui histórico real.',
+};
+
+function Metric({ label, value, detail, tone = 'neutral', icon: Icon, info }) {
   return (
     <article className={`metric metric-${tone}`}>
       <div className="metric-topline">
         <span>{label}</span>
-        {Icon && <Icon size={15} strokeWidth={1.8} aria-hidden="true" />}
+        <span className="metric-topline-actions">
+          <details className="metric-info">
+            <summary aria-label={`Informações sobre ${label}`} title="Ver explicação"><CircleHelp size={14} strokeWidth={1.8} aria-hidden="true" /></summary>
+            <span className="metric-info-popover" role="tooltip">{info || metricInfoText[label] || `${label}: ${detail}.`}</span>
+          </details>
+          {Icon && <Icon size={15} strokeWidth={1.8} aria-hidden="true" />}
+        </span>
       </div>
       <strong>{value}</strong>
       <small>{detail}</small>
     </article>
   );
+}
+
+function EmployeeSelector({ label, people, selectedIds, max, onChange, emptyMessage }) {
+  const [query, setQuery] = useState('');
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const filteredPeople = people.filter((person) => `${person.name || ''} ${person.employeeId || ''}`.toLocaleLowerCase().includes(normalizedQuery));
+  const normalizedSelectedIds = selectedIds.map((selectedId) => String(selectedId));
+  const selected = new Set(normalizedSelectedIds);
+
+  function toggle(person, checked) {
+    const id = String(person.id || person.employeeId);
+    if (checked) {
+      if (selected.has(id) || selected.size >= max) return;
+      onChange([...normalizedSelectedIds, id]);
+    } else {
+      onChange(normalizedSelectedIds.filter((selectedId) => selectedId !== id));
+    }
+  }
+
+  return <div className="employee-selector field"><span>{label}</span><div className="employee-search"><Search size={14} aria-hidden="true" /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar por nome ou matrícula" aria-label={`Pesquisar ${label.toLowerCase()}`} /></div><div className="employee-list" role="group" aria-label={label}>{filteredPeople.map((person) => { const id = String(person.id || person.employeeId); const checked = selected.has(id); const disabled = !checked && selected.size >= max; return <label className={`employee-option ${checked ? 'is-selected' : ''} ${disabled ? 'is-disabled' : ''}`} key={id}><input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => toggle(person, event.target.checked)} /><span><strong>{person.name || 'Nome não informado'}</strong><small>{person.employeeId || 'Matrícula não informada'}{person.role ? ` · ${person.role}` : ''}</small></span></label>; })}{!filteredPeople.length && <div className="employee-list-empty">{people.length ? 'Nenhum colaborador encontrado para essa pesquisa.' : emptyMessage}</div>}</div><small>{people.length ? `${selectedIds.length} selecionado(s) de até ${max}. ${filteredPeople.length} resultado(s) visível(is).` : emptyMessage}</small></div>;
 }
 
 function ScenarioCard({ id, title, kicker, value, detail, active, tone, onClick }) {
@@ -180,15 +215,18 @@ function ScenariosView({ savedScenarios, onRestore, onGoSimulator }) {
   );
 }
 
-function OverviewView({ cargoList, encargos, savedScenarios, onGoSimulator, onGoPeople, onGoReports }) {
-  const totalMonthly = cargoList.reduce((sum, cargo) => sum + custo(cargo, encargos), 0);
-  const latest = savedScenarios[0];
+function OverviewView({ cargoList, encargos, savedScenarios, people, operations, headcountPlan, approvals, onGoSimulator, onGoPeople, onGoReports, onGoOps }) {
+  const dashboard = buildExecutiveDashboard({ cargoList, encargos, savedScenarios, people, operations, headcountPlan, approvals });
+  const maxRoleCount = Math.max(...dashboard.headcountByRole.map((item) => item.value), 1);
   return (
     <>
-      <section className="hero-intro overview-hero"><div><div className="eyebrow"><span className="eyebrow-line" /> VISÃO GERAL</div><h1>Um radar para<br /><em>decidir melhor.</em></h1><p>Uma leitura consolidada da estrutura salarial, dos cenários simulados e dos próximos pontos de validação.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Configuração de Ambiente</div><strong>Base T-Sim · Bahia</strong><span>Dados carregados neste navegador</span><button onClick={onGoSimulator}>Abrir simulador <ChevronRight size={14} /></button></div></section>
-      <section className="metric-grid"><Metric label="Custo mensal de referência" value={money(totalMonthly)} detail={`${cargoList.length} cargos · encargos ${formatPercent(encargos)}`} tone="blue" icon={BarChart3} /><Metric label="Cenários salvos" value={savedScenarios.length} detail="simulações reabríveis" tone="green" icon={Layers3} /><Metric label="Último saldo aplicado" value={latest ? money(latest.appliedBalance) : '—'} detail={latest ? latest.name : 'salve uma simulação para acompanhar'} tone={latest && latest.appliedBalance < 0 ? 'orange' : 'violet'} icon={latest && latest.appliedBalance < 0 ? ArrowUpRight : Check} /><Metric label="Premissas rastreadas" value="100%" detail="fonte e classificação na tela" tone="orange" icon={ClipboardCheck} /></section>
-      <section className="overview-grid"><div className="panel-surface overview-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Fluxo recomendado</h2><p>Próximas ações para fechar uma decisão</p></div></div></div><div className="overview-flow"><button onClick={onGoPeople}><span>01</span><strong>Validar cargos</strong><small>Salários e encargos</small><ChevronRight size={15} /></button><button onClick={onGoSimulator}><span>02</span><strong>Simular movimento</strong><small>Economia e promoção</small><ChevronRight size={15} /></button><button onClick={onGoReports}><span>03</span><strong>Preparar aprovação</strong><small>Premissas e parecer</small><ChevronRight size={15} /></button></div></div><div className="panel-surface overview-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Sinais do workspace</h2><p>Leituras rápidas</p></div></div></div><div className="signal-list"><div><span className="signal-icon signal-green"><Check size={14} /></span><div><strong>Grade carregada</strong><small>{cargoList.length} níveis prontos para simulação</small></div></div><div><span className="signal-icon signal-blue"><Layers3 size={14} /></span><div><strong>{savedScenarios.length ? `${savedScenarios.length} cenário salvo` : 'Nenhum cenário salvo'}</strong><small>{savedScenarios.length ? 'Último cenário disponível para reabertura' : 'Comece pelo simulador'}</small></div></div><div><span className="signal-icon signal-orange"><ShieldCheck size={14} /></span><div><strong>Operação ainda precisa de validação</strong><small>Confira cobertura e SLA antes de aprovar</small></div></div></div></div></section>
-      <section className="panel-surface overview-panel recent-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Últimas simulações</h2><p>Resumo do que está pronto para continuar</p></div></div><button className="text-action" onClick={onGoReports}>Abrir pareceres <ChevronRight size={15} /></button></div>{savedScenarios.length === 0 ? <div className="overview-empty">Nenhuma simulação salva. <button onClick={onGoSimulator}>Abrir o simulador</button></div> : <div className="recent-scenarios">{savedScenarios.slice(0, 4).map((scenario) => <div className="recent-scenario" key={scenario.id}><div><strong>{scenario.name}</strong><span>{scenario.quantity} posição{scenario.quantity === 1 ? '' : 'ões'} · {scenario.appliedPromotions} promoç{scenario.appliedPromotions === 1 ? 'ão' : 'ões'}</span></div><strong className={scenario.appliedBalance < 0 ? 'negative-value' : 'positive-value'}>{money(scenario.appliedBalance)}</strong></div>)}</div>}</section>
+      <section className="hero-intro overview-hero executive-hero"><div><div className="eyebrow"><span className="eyebrow-line" /> COCKPIT EXECUTIVO</div><h1>Veja a operação.<br /><em>Decida com contexto.</em></h1><p>Uma leitura consolidada de pessoas, orçamento e cobertura para orientar a próxima decisão da gestão.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Dados em acompanhamento</div><strong>Administração T-Sim</strong><span>{dashboard.sourceLabel} · leitura atual</span><button onClick={onGoSimulator}>Abrir simulador <ChevronRight size={14} /></button></div></section>
+      <section className="metric-grid executive-metrics" aria-label="Indicadores executivos"><Metric label="Pessoas ativas" value={dashboard.activePeople.length || '—'} detail={dashboard.totalPeople ? `${dashboard.totalPeople} registros na base da conta` : 'importe o headcount para detalhar'} tone="blue" icon={UsersRound} /><Metric label="Custo operacional / mês" value={money(dashboard.operationalMonthly, true)} detail={`${dashboard.operationalHeadcount} HC na referência operacional`} tone="green" icon={DollarSign} /><Metric label="Cobertura atual" value={`${dashboard.coverage.current.toFixed(1)}%`} detail={`meta operacional ${dashboard.coverage.target.toFixed(1)}%`} tone={dashboard.coverage.current < dashboard.coverage.target ? 'orange' : 'violet'} icon={ShieldCheck} /><Metric label="Cenários para decisão" value={dashboard.pendingScenarios.length} detail={`${dashboard.approvedScenarios.length} aprovados · ${dashboard.positiveScenarios.length} com saldo positivo`} tone="orange" icon={Layers3} /></section>
+      <section className="executive-grid executive-grid-top"><div className="panel-surface executive-panel executive-pulse"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Pulso da operação</h2><p>Headcount informado, teto planejado e cobertura</p></div></div><button className="text-action" onClick={onGoOps}>Abrir operação <ChevronRight size={14} /></button></div><div className="pulse-readout"><div className="pulse-gauge" style={{ '--coverage': `${Math.min(100, Math.max(0, dashboard.coverage.current))}%` }}><div><strong>{dashboard.coverage.current.toFixed(1)}%</strong><span>cobertura atual</span></div></div><div className="pulse-facts"><div><span>Base operacional</span><strong>{dashboard.operationalHeadcount} HC</strong><small>referência de custos</small></div><div><span>Requerido</span><strong>{dashboard.requiredHeadcount} HC</strong><small>capacidade configurada</small></div><div><span>Planejado na conta</span><strong>{dashboard.plannedHeadcount || '—'}</strong><small>{dashboard.plannedHeadcount ? 'teto informado' : 'a informar'}</small></div></div></div><div className={`executive-status status-${dashboard.coverage.current < dashboard.coverage.target ? 'attention' : 'ready'}`}><span className="status-dot" /><strong>{dashboard.coverage.current < dashboard.coverage.target ? 'Atenção operacional' : 'Cobertura dentro da meta'}</strong><span>{dashboard.coverage.current < dashboard.coverage.target ? 'Revise o dimensionamento antes de aprovar movimentos.' : 'A base atual sustenta a meta informada para este recorte.'}</span></div></div><div className="panel-surface executive-panel priority-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Ações prioritárias</h2><p>O que merece atenção agora</p></div></div></div><div className="priority-list">{dashboard.priorities.map((item) => <button type="button" className={`priority-item priority-${item.tone}`} key={`${item.title}-${item.action}`} onClick={item.action === 'Planilhas da conta' ? onGoPeople : item.action === 'Operação' ? onGoOps : item.action === 'Pareceres' ? onGoReports : onGoSimulator}><span className="priority-icon">{item.tone === 'green' ? <Check size={15} /> : item.tone === 'orange' ? <TriangleAlert size={15} /> : <Activity size={15} />}</span><span><strong>{item.title}</strong><small>{item.detail}</small><em>{item.action} <ChevronRight size={12} /></em></span></button>)}</div></div></section>
+      <section className="executive-grid executive-grid-middle"><div className="panel-surface executive-panel chart-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Distribuição do headcount</h2><p>Concentração por cargo · somente pessoas ativas</p></div></div><span className="source-chip"><span /> {dashboard.activePeople.length ? 'Base carregada' : 'Aguardando base'}</span></div>{dashboard.headcountByRole.length ? <div className="executive-bars">{dashboard.headcountByRole.map((item) => <div className="executive-bar-row" key={item.label}><div className="executive-bar-label"><strong>{item.label}</strong><small>{item.value} pessoa{item.value === 1 ? '' : 's'}</small></div><div className="executive-bar-track"><span style={{ width: `${(item.value / maxRoleCount) * 100}%` }} /></div><b>{Math.round((item.value / dashboard.activePeople.length) * 100)}%</b></div>)}</div> : <div className="executive-empty"><UsersRound size={22} /><strong>Nenhum headcount carregado</strong><p>Importe a base operacional da conta para visualizar a distribuição por cargo.</p><button className="secondary-button" onClick={onGoPeople}>Abrir base de pessoas</button></div>}</div><div className="panel-surface executive-panel chart-panel"><div className="panel-heading compact"><div><span className="section-index">04</span><div><h2>Custo por contexto</h2><p>Referência operacional · mês</p></div></div></div><div className="executive-bars cost-bars">{dashboard.operationalRows.slice(0, 5).map((item) => <div className="executive-bar-row" key={item.id}><div className="executive-bar-label"><strong>{item.label}</strong><small>{item.headcount || '—'} HC · {item.classification || 'Informada'}</small></div><div className="executive-bar-track"><span className="cost-bar" style={{ width: `${((Number(item.monthlyCost) || 0) / dashboard.maxOperationalCost) * 100}%` }} /></div><b>{money(item.monthlyCost, true)}</b></div>)}</div><div className="chart-footnote"><span><span className="info-marker">i</span>Fonte: {dashboard.sourceLabel}</span><strong>{money(dashboard.operationalMonthly, true)} / mês</strong></div></div></section>
+      <section className="panel-surface executive-panel executive-scenarios"><div className="panel-heading compact"><div><span className="section-index">05</span><div><h2>Decisões em andamento</h2><p>Últimos cenários salvos e seu estado de aprovação</p></div></div><button className="text-action" onClick={onGoReports}>Abrir pareceres <ChevronRight size={14} /></button></div>{dashboard.scenarios.length ? <div className="executive-scenario-table"><div className="executive-scenario-head"><span>Cenário</span><span>Saldo mensal</span><span>Estado</span><span>Atualizado</span></div>{dashboard.scenarios.slice(0, 5).map((scenario) => <div className="executive-scenario-row" key={scenario.id}><div><strong>{scenario.name}</strong><small>{scenario.quantity || 0} posição{scenario.quantity === 1 ? '' : 'ões'} · {scenario.appliedPromotions || 0} promoção{scenario.appliedPromotions === 1 ? '' : 'ões'}</small></div><strong className={Number(scenario.appliedBalance) < 0 ? 'negative-value' : 'positive-value'}>{money(scenario.appliedBalance || 0)}</strong><span className={`scenario-status scenario-status-${scenario.status.toLowerCase().replace(/[^a-z]+/g, '-')}`}>{scenario.status}</span><small>{scenario.savedAt ? new Date(scenario.savedAt).toLocaleDateString('pt-BR') : '—'}</small></div>)}</div> : <div className="executive-empty executive-empty-inline"><Layers3 size={20} /><span>Nenhum cenário salvo. <button onClick={onGoSimulator}>Abrir o simulador para criar o primeiro.</button></span></div>}</section>
+      <section className="panel-surface executive-panel salary-panel"><div className="panel-heading compact"><div><span className="section-index">06</span><div><h2>Escada de custo dos cargos</h2><p>Salário base + encargos da referência ativa</p></div></div><button className="text-action" onClick={onGoPeople}>Editar referência <ChevronRight size={14} /></button></div><div className="executive-salary-grid">{dashboard.salaryLadder.map((item) => <div className="salary-column" key={item.label}><div className="salary-column-bar"><span style={{ height: `${(item.total / dashboard.maxSalary) * 100}%` }} /></div><strong>{money(item.total, true)}</strong><small>{item.level || item.label}</small><em>{item.label}</em></div>)}</div><div className="chart-footnote"><span><span className="legend-swatch salary" /> Salário base <span className="legend-swatch burden" /> Encargos</span><strong>Encargos configurados: {formatPercent(encargos)}</strong></div></section>
+      <div className="panel-note executive-note"><Database size={16} /><span>Leitura executiva baseada em dados carregados e referências versionadas. Custo operacional, grade salarial e cenários permanecem separados por contexto. ROI, retenção, produtividade e payback continuam classificados como estimativas.</span></div>
     </>
   );
 }
@@ -950,22 +988,7 @@ function App() {
     setSaveMessage(`Cenário ${scenario.name} reaberto`);
   }
 
-  const recommendationLabel = manualMode ? 'Ajuste manual' : activeScenario === 'conservative' ? 'Conservador' : activeScenario === 'aggressive' ? 'Agressivo' : 'Equilibrado';
   const appliedScenarioLabel = manualMode ? 'ajuste manual' : activeScenario === 'conservative' ? 'conservador' : activeScenario === 'aggressive' ? 'agressivo' : 'equilibrado';
-  const recommendationText = calc.appliedBalance < 0
-    ? 'O saldo ficou negativo. Reduza promoções ou valide uma fonte orçamentária adicional antes de aprovar.'
-    : manualMode
-      ? 'O ajuste manual está aplicado. Compare o saldo mensal e confirme a capacidade operacional antes de aprovar.'
-      : activeScenario === 'conservative'
-        ? 'Preserva o caixa e adia progressões até que a capacidade e o orçamento sejam confirmados.'
-        : activeScenario === 'aggressive'
-          ? 'Maximiza a retenção projetada, mas exige validação do saldo e da cobertura operacional.'
-          : 'Preserva saldo positivo e transforma a economia em progressão técnica sem comprometer a cobertura.';
-  const scenarioData = {
-    conservative: { title: 'Conservador', kicker: 'Controle de caixa', value: money(calc.economy, true), detail: 'saldo mensal preservado', tone: 'green' },
-    balanced: { title: 'Equilibrado', kicker: 'Recomendado', value: money(calc.economy - calc.delta * calc.balancedPromotions, true), detail: `${calc.balancedPromotions} promoções financiadas`, tone: 'blue' },
-    aggressive: { title: 'Agressivo', kicker: 'Retenção máxima', value: money(calc.economy - calc.delta * calc.aggressivePromotions, true), detail: `${calc.aggressivePromotions} promoções projetadas`, tone: 'orange' },
-  };
 
   const maxChart = Math.max(...configuredCargos.map((cargo) => custo(cargo, configuredEncargos)));
   const salaryPremise = configuredCargos.find((cargo) => cargo.id === originRole) ?? configuredCargos[0];
@@ -1034,7 +1057,7 @@ function App() {
         </header>
 
         <div className="content-wrap" id="workspace-content" tabIndex="-1">
-          {!account?.isAdmin && !['workspace', 'simulator', 'scenarios'].includes(activeView) ? <UserWorkspaceView profileName={account?.fullName || 'Usuário'} people={people} scenarios={savedScenarios} cargos={configuredCargos} encargos={configuredEncargos} salaryReference={salaryReference} approvals={approvals} headcountPlan={headcountPlan} onImportHeadcount={handleImportWorkbook} onSaveHeadcountPlan={handleSaveHeadcountPlan} /> : activeView === 'workspace' ? <UserWorkspaceView profileName={account?.fullName || 'Usuário'} people={people} scenarios={savedScenarios} cargos={configuredCargos} encargos={configuredEncargos} salaryReference={salaryReference} approvals={approvals} headcountPlan={headcountPlan} onImportHeadcount={handleImportWorkbook} onSaveHeadcountPlan={handleSaveHeadcountPlan} /> : activeView === 'accounts' && account?.isAdmin ? <AccessManagementView /> : activeView === 'people' && account?.isAdmin ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} people={people} onSaveConfiguration={handleSaveConfiguration} saved={Boolean(window.localStorage.getItem(workspaceStorageKey('tsim.configuration.v1')))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' && account?.isAdmin ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} /> : activeView === 'presentation' && account?.isAdmin ? <InstitutionalView onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'ops' && account?.isAdmin ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' && account?.isAdmin ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} activeProfileName={profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base local'} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' && account?.isAdmin ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' && account?.isAdmin ? <AnalyticsView savedScenarios={savedScenarios} operations={operations} /> : activeView === 'ai' && account?.isAdmin ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' && account?.isAdmin ? <SettingsView configuration={configuration} operations={operations} accountWorkspaces={accountWorkspaces} salaryReference={salaryReference} savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} people={people} assumptions={assumptions} profiles={profiles} activeProfileId={activeProfileId} onProfileChange={handleProfileChange} onCreateProfile={handleCreateProfile} onClearWorkspace={handleClearWorkspace} onImportWorkbook={handleImportWorkbook} /> : <>
+          {!account?.isAdmin && !['workspace', 'simulator', 'scenarios'].includes(activeView) ? <UserWorkspaceView profileName={account?.fullName || 'Usuário'} people={people} scenarios={savedScenarios} cargos={configuredCargos} encargos={configuredEncargos} salaryReference={salaryReference} approvals={approvals} headcountPlan={headcountPlan} onImportHeadcount={handleImportWorkbook} onSaveHeadcountPlan={handleSaveHeadcountPlan} /> : activeView === 'workspace' ? <UserWorkspaceView profileName={account?.fullName || 'Usuário'} people={people} scenarios={savedScenarios} cargos={configuredCargos} encargos={configuredEncargos} salaryReference={salaryReference} approvals={approvals} headcountPlan={headcountPlan} onImportHeadcount={handleImportWorkbook} onSaveHeadcountPlan={handleSaveHeadcountPlan} /> : activeView === 'accounts' && account?.isAdmin ? <AccessManagementView /> : activeView === 'people' && account?.isAdmin ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} people={people} onSaveConfiguration={handleSaveConfiguration} saved={Boolean(window.localStorage.getItem(workspaceStorageKey('tsim.configuration.v1')))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' && account?.isAdmin ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} people={people} operations={operations} headcountPlan={headcountPlan} approvals={approvals} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} onGoOps={() => setActiveView('ops')} /> : activeView === 'presentation' && account?.isAdmin ? <InstitutionalView onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'ops' && account?.isAdmin ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' && account?.isAdmin ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} activeProfileName={profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base local'} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' && account?.isAdmin ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' && account?.isAdmin ? <AnalyticsView savedScenarios={savedScenarios} operations={operations} /> : activeView === 'ai' && account?.isAdmin ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' && account?.isAdmin ? <SettingsView configuration={configuration} operations={operations} accountWorkspaces={accountWorkspaces} salaryReference={salaryReference} savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} people={people} assumptions={assumptions} profiles={profiles} activeProfileId={activeProfileId} onProfileChange={handleProfileChange} onCreateProfile={handleCreateProfile} onClearWorkspace={handleClearWorkspace} onImportWorkbook={handleImportWorkbook} /> : <>
           <section className="hero-intro">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> SIMULADOR DE DECISÃO</div>
@@ -1056,7 +1079,7 @@ function App() {
             <Metric label="ROI estimado" value={calc.roi ? `${calc.roi.toFixed(1)}x` : '—'} detail="custo de substituição · 3 salários" tone="violet" icon={Sparkles} />
           </section>
 
-          <section className="decision-grid">
+          <section className="decision-grid decision-grid-single">
             <div className="simulator-panel panel-surface">
               <div className="panel-heading">
                 <div><span className="section-index">01</span><div><h2>Monte sua movimentação</h2><p>Defina a origem, o destino e a quantidade. O resultado se recalcula a cada escolha.</p></div></div>
@@ -1073,8 +1096,8 @@ function App() {
               </div>
 
               {people.length > 0 && <div className="field-grid employee-selection-grid">
-                <label className="field"><span>Colaboradores desligados · opcional</span><select multiple size="4" value={selectedDismissalIds} onChange={(event) => setSelectedDismissalIds([...event.target.selectedOptions].map((option) => option.value).slice(0, quantity))}>{dismissedPeople.map((person) => <option key={person.id || person.employeeId} value={person.id || person.employeeId}>{person.name} · {person.employeeId}</option>)}</select><small>{dismissedPeople.length ? `Selecione até ${quantity} nome(s) da base.` : 'Nenhum registro da base corresponde ao cargo selecionado.'}</small></label>
-                <label className="field"><span>Colaboradores a promover · opcional</span><select multiple size="4" value={selectedPromotionIds} onChange={(event) => setSelectedPromotionIds([...event.target.selectedOptions].map((option) => option.value).slice(0, calc.appliedPromotions))}>{promotionPeople.map((person) => <option key={person.id || person.employeeId} value={person.id || person.employeeId}>{person.name} · {person.employeeId}</option>)}</select><small>{promotionPeople.length ? `Selecione até ${calc.appliedPromotions} nome(s) da origem.` : 'Nenhum registro da base corresponde ao cargo de origem.'}</small></label>
+                <EmployeeSelector label="Colaboradores desligados · opcional" people={dismissedPeople} selectedIds={selectedDismissalIds} max={quantity} onChange={setSelectedDismissalIds} emptyMessage="Nenhum registro da base corresponde ao cargo selecionado." />
+                <EmployeeSelector label="Colaboradores a promover · opcional" people={promotionPeople} selectedIds={selectedPromotionIds} max={Math.max(0, calc.appliedPromotions)} onChange={setSelectedPromotionIds} emptyMessage="Nenhum registro da base corresponde ao cargo de origem." />
               </div>}
 
               <div className="movement-readout">
@@ -1102,14 +1125,6 @@ function App() {
               </div>
             </div>
 
-            <aside className="scenario-panel">
-              <div className="scenario-panel-heading"><div><span className="section-index">02</span><h2>Compare caminhos</h2></div><button className="icon-button" aria-label="Abrir guia"><BookOpen size={16} /></button></div>
-              <p className="scenario-intro">A mesma economia pode produzir decisões diferentes. Escolha a intenção de negócio para projetar o próximo passo.</p>
-              <div className="scenario-list">
-                {Object.entries(scenarioData).map(([id, scenario]) => <ScenarioCard key={id} id={id} {...scenario} active={activeScenario === id} onClick={() => setActiveScenario(id)} />)}
-              </div>
-              <div className="recommendation"><span className="recommendation-tag"><ShieldCheck size={14} /> Leitura T-Sim</span><strong>{recommendationLabel}</strong><p>{recommendationText}</p><button onClick={() => setShowAssumptions(true)}>Ver justificativa <ChevronRight size={14} /></button></div>
-            </aside>
           </section>
 
           <section className="analysis-grid">

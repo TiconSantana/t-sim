@@ -22,8 +22,34 @@
 | `git diff --check` | Passou; somente avisos de normalização CRLF do Git |
 | Preview local | Navegação, Budget, Pareceres, tema e skip link conferidos no navegador |
 | Fluxos visuais | Acesso local, onboarding e Apresentação já conferidos nesta etapa |
-| Primeira visita | A aplicação abre direto no workspace local; o acesso compartilhado fica em Configurações |
+| Primeira visita | A aplicação abre na tela de acesso local; o workspace compartilhado fica disponível após a sessão |
 | Responsividade | Breakpoints de sidebar, hero, grades e entrada revisados no CSS |
+
+### Revisão adicional — contraste do tema escuro (09/10/2026)
+
+Foi corrigida a camada de contraste do tema escuro em todas as superfícies que ainda usavam
+fundos claros do tema original. A revisão cobre o simulador de movimentação, leitura de economia,
+comparação automático/manual, cenários salvos, People, Budget, Ops, Analytics, Pareceres,
+histórico de auditoria, badges, trilhas de gráficos, controles de formulário e atalhos de teclado.
+
+As superfícies agora usam os tokens escuros (`--surface`, `--surface-raised` e `--surface-muted`)
+com texto principal em `--ink-950`, texto auxiliar em `--ink-700/800` e estados de ação em azul,
+laranja e verde com contraste próprio. Isso evita texto claro sobre cartões brancos e preserva a
+leitura de valores financeiros e status operacionais.
+
+| Verificação | Resultado |
+|---|---|
+| Build após a revisão de contraste | Passou; somente avisos já conhecidos do `lucide-react` |
+| Verificação de whitespace | `git diff --check` passou |
+| Escopo funcional | Nenhuma regra de cálculo ou dado de domínio foi alterado |
+| Limitação | O workspace local abre a tela de acesso; a validação visual interna não usa credenciais de produção |
+
+### Ajustes de leitura e seleção no simulador (09/10/2026)
+
+- Os quatro indicadores do simulador exibem um ícone informativo com abertura por foco, hover ou clique.
+- O painel lateral “Compare caminhos” foi removido para concentrar a tela na montagem do cenário.
+- A seleção de colaboradores usa nomes em destaque, matrícula e cargo, caixas de seleção e pesquisa por nome ou matrícula.
+- A lista mantém a seleção mesmo quando o filtro de pesquisa é alterado e respeita o limite calculado de posições.
 
 ## Limitações conhecidas
 
