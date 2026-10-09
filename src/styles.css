@@ -746,3 +746,61 @@ html[data-theme="dark"] .access-denial-reason input { border-color: var(--ink-20
   .access-failed-notice { align-items: stretch; flex-direction: column; }
   .access-failed-notice button { justify-content: center; }
 }
+.user-workspace-grid {
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: minmax(0, 1.45fr) minmax(18rem, .8fr);
+  align-items: start;
+}
+.user-file-panel { min-width: 0; padding: 1.25rem; }
+.user-file-actions { display: flex; flex-wrap: wrap; gap: .65rem; margin: 1rem 0 .6rem; }
+.user-file-actions button, .scenario-file-panel > .primary-button { display: inline-flex; align-items: center; gap: .5rem; }
+.user-file-note { margin: .65rem 0 1rem; color: var(--ink-500); font-size: .82rem; line-height: 1.55; }
+.user-headcount-wrap { max-height: 31rem; overflow: auto; border: 1px solid var(--ink-200); border-radius: .6rem; }
+.user-headcount-table { min-width: 1050px; }
+.user-headcount-table thead { position: sticky; top: 0; z-index: 1; }
+.user-workspace-empty { margin-top: 1.2rem; border: 1px dashed var(--ink-200); }
+.headcount-planning-panel { margin-top: 1.1rem; padding: 1.25rem; border-top: 3px solid var(--blue); }
+.headcount-planning-panel .panel-heading { align-items: flex-start; }
+.headcount-plan-table-wrap { overflow-x: auto; border: 1px solid var(--ink-200); border-radius: .65rem; }
+.headcount-plan-table { width: 100%; min-width: 1120px; border-collapse: collapse; text-align: left; }
+.headcount-plan-table th, .headcount-plan-table td { padding: .85rem .9rem; border-bottom: 1px solid var(--ink-100); vertical-align: middle; }
+.headcount-plan-table thead { background: color-mix(in srgb, var(--blue) 7%, var(--surface)); }
+.headcount-plan-table thead th { color: var(--ink-600); font-size: .72rem; font-weight: 700; letter-spacing: .025em; }
+.headcount-plan-table tbody tr:last-child { background: color-mix(in srgb, var(--blue) 5%, var(--surface)); }
+.headcount-plan-table tbody th { min-width: 145px; color: var(--ink-950); font-size: .88rem; }
+.headcount-plan-table tbody td { min-width: 135px; color: var(--ink-800); font-size: .84rem; }
+.headcount-plan-table tbody th small, .headcount-plan-table tbody td small { display: block; margin-top: .25rem; color: var(--ink-500); font-size: .7rem; font-weight: 400; line-height: 1.4; }
+.headcount-actual-number, .headcount-plan-total { color: var(--blue); font-size: 1.1rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.headcount-plan-input input { width: 9.25rem; min-height: 2.55rem; padding: .55rem .65rem; border: 1px solid var(--ink-300); border-radius: .45rem; background: var(--surface); color: var(--ink-950); font: inherit; font-variant-numeric: tabular-nums; }
+.headcount-plan-input input:focus-visible { outline: 3px solid color-mix(in srgb, var(--blue) 32%, transparent); outline-offset: 1px; border-color: var(--blue); }
+.headcount-status { display: inline-flex; align-items: center; min-height: 1.8rem; padding: .28rem .55rem; border-radius: .35rem; font-size: .73rem; font-weight: 700; }
+.headcount-status.over { color: #8b3d00; background: color-mix(in srgb, var(--orange) 15%, var(--surface)); }
+.headcount-status.under { color: #075b45; background: color-mix(in srgb, #1c9a73 12%, var(--surface)); }
+.headcount-status.balanced { color: var(--blue); background: color-mix(in srgb, var(--blue) 10%, var(--surface)); }
+.headcount-finance-over, .headcount-finance-under, .headcount-finance-value { display: block; color: var(--ink-900); font-size: .82rem; font-variant-numeric: tabular-nums; }
+.headcount-finance-over { color: #9b4700; }
+.headcount-finance-under { color: #087452; }
+.headcount-finance-unavailable { display: block; max-width: 14rem; color: var(--ink-500); font-size: .72rem; line-height: 1.4; }
+.headcount-plan-empty { display: flex; align-items: center; gap: .65rem; margin-top: .85rem; padding: .8rem; border-left: 3px solid var(--orange); background: color-mix(in srgb, var(--orange) 7%, var(--surface)); color: var(--ink-700); font-size: .8rem; }
+.headcount-plan-empty svg { flex: 0 0 auto; color: var(--orange); }
+.headcount-plan-warning { margin: .75rem 0 0; padding: .65rem .75rem; border-left: 3px solid var(--orange); background: color-mix(in srgb, var(--orange) 7%, var(--surface)); color: var(--ink-700); font-size: .76rem; line-height: 1.5; }
+.headcount-plan-formula { margin: .8rem 0 0; color: var(--ink-500); font-size: .72rem; line-height: 1.55; }
+.headcount-plan-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--ink-100); }
+.headcount-plan-actions p { margin: 0; color: var(--ink-500); font-size: .76rem; }
+.headcount-plan-actions button { display: inline-flex; align-items: center; gap: .45rem; white-space: nowrap; }
+.headcount-draft-chip { color: #8b3d00; background: color-mix(in srgb, var(--orange) 15%, var(--surface)); }
+html[data-theme="dark"] .headcount-plan-input input { border-color: var(--ink-300); background: #08131f; color: var(--ink-950); }
+html[data-theme="dark"] .headcount-status.over, html[data-theme="dark"] .headcount-finance-over { color: #ffc188; }
+html[data-theme="dark"] .headcount-status.under, html[data-theme="dark"] .headcount-finance-under { color: #a2efd3; }
+@media (max-width: 600px) {
+  .headcount-planning-panel { padding: .95rem; }
+  .headcount-planning-panel .panel-heading { flex-direction: column; }
+  .headcount-plan-actions { align-items: stretch; flex-direction: column; }
+  .headcount-plan-actions button { justify-content: center; }
+}
+.scenario-download-strip { display: flex; align-items: flex-start; gap: .85rem; margin: 1.5rem 0; padding: 1rem; border-left: 3px solid var(--orange); background: color-mix(in srgb, var(--orange) 8%, var(--surface)); }
+.scenario-download-strip > svg { color: var(--orange); flex: 0 0 auto; }
+.scenario-download-strip div { display: grid; gap: .35rem; }
+.scenario-download-strip span { color: var(--ink-500); font-size: .83rem; line-height: 1.45; }
+@media (max-width: 920px) { .user-workspace-grid { grid-template-columns: 1fr; } }

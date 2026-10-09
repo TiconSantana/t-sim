@@ -8,13 +8,12 @@ O T-Sim está publicado em [https://t-sim.vercel.app](https://t-sim.vercel.app) 
 
 - **Vercel:** hospedagem gratuita da aplicação estática.
 - **GitHub:** repositório oficial em `TiconSantana/t-sim`.
-- **Persistência local:** cenários, premissas, operações, pessoas e aprovações ficam no `localStorage` do navegador atual.
-- **Perfis locais:** Configurações permite organizar e alternar bases no mesmo navegador, sem login ou compartilhamento externo. Eles não são contas nem uma barreira de acesso para pessoas que usam o mesmo navegador.
-- **Backup manual:** a tela Configurações exporta e importa o backup completo em Excel `.xlsx`.
-- **Portal de acesso:** interface e funções Vercel para matrícula, cadastro pendente, revisão administrativa e notificações; a ativação depende da configuração de Supabase e Gmail SMTP.
-- **Base própria por navegador:** os dados importados e calculados continuam no `localStorage` e não são isolados por usuário autenticado.
-- **Planilha padrão:** o arquivo `.xlsx` pode ser baixado em Configurações, preenchido pelo usuário e importado pela opção **Importar planilha completa**. As abas Cargos, Pessoas, Premissas, Operação e Cenários são lidas localmente; a importação também reconhece a estrutura operacional da planilha de custos V.TAL.
-- **Variáveis externas atuais:** nenhuma variável de Supabase ou TConnect está configurada no projeto Vercel; isso mantém a aplicação em modo sem backend.
+- **Sessão e contas:** login, cadastro pendente, revisão administrativa e notificações usam as rotas Vercel e Supabase descritas em [`ACESSO_E_CONTAS.md`](ACESSO_E_CONTAS.md).
+- **Headcount e cenários:** rotas autenticadas guardam cada base e seus cenários sob o `user_id` da sessão. Usuários só veem e alteram os próprios registros; o administrador pode consultar as bases pelo endpoint administrativo.
+- **Referência salarial:** uma linha global guarda cargos, encargos, fonte, vigência, versão e responsável. A gravação exige sessão administrativa.
+- **Planilhas:** Headcount e Cenário são arquivos independentes, nomeados com o nome do perfil. O modelo Headcount tem uma aba e apenas os 12 cabeçalhos. Cargos e Salário não é disponibilizada para download a usuários comuns. Veja [`PLANILHA_PADRAO_TSIM.md`](PLANILHA_PADRAO_TSIM.md).
+- **Operação administrativa:** módulos fora de Headcount e Cenários continuam armazenados localmente no navegador do administrador nesta fase. A autenticação do portal não os sincroniza entre aparelhos.
+- **Variáveis externas atuais:** verifique [`ACESSO_E_CONTAS.md`](ACESSO_E_CONTAS.md) para o estado de configuração e implantação das variáveis do Supabase e do Gmail.
 - **Cabeçalhos de segurança:** a Vercel envia `nosniff`, política de referência restrita, bloqueio de enquadramento e desativa câmera, microfone e geolocalização.
 - **Planilhas enviadas:** o app usa o espelho npm comunitário `@e965/xlsx@0.20.3`, que publica a versão corrigida do SheetJS e não tem dependências próprias. O leitor Excel é carregado sob demanda ao abrir ou exportar `.xlsx`.
 
@@ -24,10 +23,12 @@ Em 08/10/2026 foram implementadas as rotas de API e a migração da base de cont
 
 Detalhes e contrato esperado: [`ACESSO_E_CONTAS.md`](ACESSO_E_CONTAS.md).
 
+`supabase/migrations/20261009001801_user_workspaces_and_reference_data.sql` já foi aplicada ao projeto Supabase T-Sim. As rotas `/api/workspace` usam as tabelas criadas pela migração. A interface será publicada pelo deploy da branch `main`.
+
 ## Publicação
 
 Cada atualização enviada para a branch `main` gera um novo deploy automático na Vercel. O build de produção é executado com `pnpm build`.
 
 ## Limite atual
 
-O deploy público disponibiliza a aplicação em qualquer aparelho conectado, mas cada navegador mantém sua própria base local. A autenticação controla o portal e a administração de contas; não protege nem sincroniza os dados de gestão salvos localmente. Para levar dados a outro aparelho, exporte o backup Excel `.xlsx` ou a planilha preenchida e importe no novo ambiente. A persistência compartilhada de cenários e cadastros continua dependendo de APIs de gestão próprias.
+Os dados de Headcount e Cenário são isolados por conta após a migração de workspace ser aplicada. Os módulos administrativos restantes continuam locais ao navegador do administrador. O sistema gera arquivos para download; não envia e-mails nem submete pedidos de aprovação externos automaticamente.

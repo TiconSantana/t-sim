@@ -37,22 +37,27 @@ import { cargos, cargoSourceConfirmation, custo, MESES } from './data/cargos';
 import { costAssumptions, operationalCosts, operationalSource, operationsDefaults, teamClasses } from './data/operacao';
 import { calculateSimulation } from './domain/simulation';
 import { calculateCoverage, calculateDimensionCoverage, validateScenarioForApproval } from './domain/operations';
-import { createLocalProfile, getActiveProfileId, loadApprovalHistory, loadApprovals, loadConfiguration, loadImportedAssumptions, loadLocalProfiles, loadOperations, loadPeople, loadSavedScenarios, normalizeOperations, saveApproval, saveApprovalHistory, saveConfiguration, saveImportedAssumptions, saveOperations, savePeople, saveScenario, saveScenarioList, setActiveProfile, workspaceStorageKey } from './storage/scenarios';
-import { parseDimensionSheet, parseTsimWorkbook, retainExistingIfImportEmpty } from './domain/workbookImport';
+import { createLocalProfile, getActiveProfileId, loadApprovalHistory, loadApprovals, loadConfiguration, loadImportedAssumptions, loadLocalProfiles, loadOperations, loadPeople, loadSavedScenarios, normalizeOperations, saveApproval, saveApprovalHistory, saveConfiguration, saveImportedAssumptions, saveOperations, setActiveProfile, workspaceStorageKey } from './storage/scenarios';
+import { parseCargoSheet, parseDimensionSheet } from './domain/workbookImport';
+import { parseHeadcountRows } from './domain/headcount';
+import { normalizeHeadcountPlan } from './domain/headcountPlanning';
+import UserWorkspaceView from './components/UserWorkspaceView';
+import { loadAccountWorkspace, saveAccountWorkspace, saveAdminReference } from './lib/accountWorkspace';
 import './styles.css';
 
 const navItems = [
-  { id: 'overview', label: 'Visão geral', icon: Gauge },
-  { id: 'presentation', label: 'Apresentação', icon: BookOpen },
-  { id: 'simulator', label: 'Simulador', icon: SlidersHorizontal },
-  { id: 'people', label: 'Cargos e pessoas', icon: UsersRound },
-  { id: 'scenarios', label: 'Cenários', icon: Layers3 },
-  { id: 'ops', label: 'Operação', icon: Activity },
-  { id: 'reports', label: 'Pareceres', icon: FileText },
-  { id: 'budget', label: 'Budget', icon: DollarSign },
-  { id: 'analytics', label: 'Analytics', icon: LineChart },
-  { id: 'ai', label: 'T-Sim AI', icon: Sparkles },
-  { id: 'settings', label: 'Configuração de Ambiente', icon: Settings },
+  { id: 'workspace', label: 'Planilhas da conta', icon: FileSpreadsheet, userAllowed: true },
+  { id: 'simulator', label: 'Simulador', icon: SlidersHorizontal, userAllowed: true },
+  { id: 'scenarios', label: 'Cenários', icon: Layers3, userAllowed: true },
+  { id: 'overview', label: 'Visão geral', icon: Gauge, adminOnly: true },
+  { id: 'presentation', label: 'Apresentação', icon: BookOpen, adminOnly: true },
+  { id: 'people', label: 'Cargos e pessoas', icon: UsersRound, adminOnly: true },
+  { id: 'ops', label: 'Operação', icon: Activity, adminOnly: true },
+  { id: 'reports', label: 'Pareceres', icon: FileText, adminOnly: true },
+  { id: 'budget', label: 'Budget', icon: DollarSign, adminOnly: true },
+  { id: 'analytics', label: 'Analytics', icon: LineChart, adminOnly: true },
+  { id: 'ai', label: 'T-Sim AI', icon: Sparkles, adminOnly: true },
+  { id: 'settings', label: 'Configuração de Ambiente', icon: Settings, adminOnly: true },
   { id: 'accounts', label: 'Contas de acesso', icon: UsersRound, adminOnly: true },
 ];
 
@@ -93,7 +98,7 @@ function ScenarioCard({ id, title, kicker, value, detail, active, tone, onClick 
   );
 }
 
-function PeopleView({ cargoList, encargos, people = [], onSaveConfiguration, onResetConfiguration, saved }) {
+function PeopleView({ cargoList, encargos, people = [], onSaveConfiguration, saved }) {
   const [draftCargos, setDraftCargos] = useState(() => cargoList.map((cargo) => ({ ...cargo })));
   const [draftEncargos, setDraftEncargos] = useState(Math.round(encargos * 100));
   const [message, setMessage] = useState('');
@@ -101,7 +106,7 @@ function PeopleView({ cargoList, encargos, people = [], onSaveConfiguration, onR
   const fileInputRef = useRef(null);
   const totalMonthly = draftCargos.reduce((sum, cargo) => sum + custo(cargo, draftEncargos / 100), 0);
   const seedReferenceActive = cargoList.length === cargos.length && cargoList.every((cargo, index) => cargo.salary === cargos[index]?.salary && cargo.source === cargos[index]?.source);
-  const hasChanges = draftEncargos !== Math.round(encargos * 100) || draftCargos.some((cargo, index) => cargo.salary !== cargoList[index].salary);
+  const hasChanges = draftEncargos !== Math.round(encargos * 100) || draftCargos.length !== cargoList.length || draftCargos.some((cargo, index) => JSON.stringify(cargo) !== JSON.stringify(cargoList[index]));
 
   useEffect(() => {
     setDraftCargos(cargoList.map((cargo) => ({ ...cargo })));
@@ -112,20 +117,19 @@ function PeopleView({ cargoList, encargos, people = [], onSaveConfiguration, onR
     setDraftCargos((current) => current.map((cargo) => cargo.id === id ? { ...cargo, salary: Math.max(0, Number(value) || 0) } : cargo));
   }
 
-  function saveChanges() {
-    onSaveConfiguration({ cargos: draftCargos, encargos: draftEncargos / 100 });
-    setMessage('Premissas salvas e aplicadas ao simulador');
+  async function saveChanges() {
+    try {
+      await onSaveConfiguration({ cargos: draftCargos, encargos: draftEncargos / 100 });
+      setMessage('Cargos e encargos salvos na referência do sistema.');
+    } catch (error) {
+      setMessage(error.message || 'Não foi possível salvar a referência.');
+    }
   }
 
   function resetChanges() {
-    setDraftCargos(cargos.map((cargo) => ({ ...cargo })));
-    setDraftEncargos(113);
-    onResetConfiguration();
-    setMessage('Valores de referência restaurados');
-  }
-
-  function normalizeLabel(value) {
-    return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    setDraftCargos(cargoList.map((cargo) => ({ ...cargo })));
+    setDraftEncargos(Math.round(encargos * 100));
+    setMessage('Alterações não salvas descartadas.');
   }
 
   async function importSpreadsheet(event) {
@@ -135,39 +139,17 @@ function PeopleView({ cargoList, encargos, people = [], onSaveConfiguration, onR
       if (!file.name.toLowerCase().endsWith('.xlsx')) throw new Error('Selecione uma planilha Excel no formato .xlsx.');
       const XLSX = await import('xlsx');
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
+      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+      if (workbook.SheetNames.length !== 1) throw new Error('Cargos e Salário deve ter somente uma aba.');
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: null });
-      const header = rows[0]?.map(normalizeLabel) || [];
-      const salaryColumn = header.findIndex((label) => label.includes('SALARIO') || label.includes('REMUNERACAO') || label.includes('VALOR'));
-      const nextCargos = draftCargos.map((cargo) => ({ ...cargo }));
-      let found = 0;
-      rows.forEach((row) => {
-        const label = normalizeLabel(row?.[0]);
-        const rawSalary = salaryColumn >= 0 ? row?.[salaryColumn] : row?.[1];
-        const rawValue = typeof rawSalary === 'number'
-          ? rawSalary
-          : Number(String(rawSalary ?? '').replace(/\./g, '').replace(',', '.'));
-        if (!Number.isFinite(rawValue) || rawValue <= 0) return;
-        let id = null;
-        if (label.includes('AUXILIAR')) id = 'auxiliar';
-        else if (label.includes('TECNICO') && (label.includes('VI') || label.includes('N/6'))) id = 'tecnico-vi';
-        else if (label.includes('TECNICO') && (label.includes('IV') || label.includes('N/4'))) id = 'tecnico-n4';
-        else if (label.includes('TECNICO') && (label.includes('III') || label.includes('N/3'))) id = 'tecnico-n3';
-        else if (label.includes('TECNICO') && (label.includes('II') || label.includes('N/2'))) id = 'tecnico-ii';
-        else if (label.includes('TECNICO') && (label.includes('V') || label.includes('N/5'))) id = 'tecnico-v';
-        if (!id) return;
-        const index = nextCargos.findIndex((cargo) => cargo.id === id);
-        if (index >= 0) {
-          nextCargos[index] = { ...nextCargos[index], salary: rawValue, source: 'Planilha importada localmente · revisar origem', validity: 'Vigência a confirmar' };
-          found += 1;
-        }
-      });
-      if (!found) {
+      const result = parseCargoSheet(rows, draftCargos);
+      if (!result.count) {
         setImportMessage('Nenhum cargo compatível encontrado. Confira as colunas Cargo e Salário base.');
       } else {
-        setDraftCargos(nextCargos);
-        setImportMessage(`${found} cargo(s) importado(s). Revise e salve as premissas.`);
+        setDraftCargos(result.cargos);
+        if (result.encargos !== null) setDraftEncargos(result.encargos * 100);
+        setImportMessage(`${result.count} cargo(s) lido(s), incluindo novos níveis. Revise fonte, vigência e encargos antes de salvar.`);
         setMessage('');
       }
     } catch (error) {
@@ -181,9 +163,9 @@ function PeopleView({ cargoList, encargos, people = [], onSaveConfiguration, onR
     <>
       <section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> BASE DE PESSOAS</div><h1>Conheça a sua<br /><em>estrutura.</em></h1><p>Edite a grade salarial e os encargos de referência. As alterações salvas alimentam imediatamente o simulador e os cenários.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Fonte ativa</div><strong>{cargoList[0]?.source || 'Fonte não informada'}</strong><span>{saved ? 'Configuração local salva' : `Valores ${cargoList[0]?.validity || 'com vigência a confirmar'}`}</span><button onClick={() => setMessage(`Fonte: ${cargoList[0]?.source || 'não informada'}. ${seedReferenceActive ? `${cargoSourceConfirmation.note} Confirmado por ${cargoSourceConfirmation.confirmedBy} em ${cargoSourceConfirmation.confirmedAt}.` : `Situação registrada: ${cargoList[0]?.validity || 'vigência a confirmar'}.`}`)}>Ver origem <ChevronRight size={14} /></button></div></section>
       <section className="metric-grid"><Metric label="Cargos cadastrados" value={draftCargos.length} detail="níveis de fibra óptica" tone="blue" icon={Layers3} /><Metric label="Custo mensal total" value={money(totalMonthly)} detail="salário + encargos configurados" tone="green" icon={BarChart3} /><Metric label="Amplitude salarial" value={`${Math.round((draftCargos.at(-1).salary / Math.max(1, draftCargos[0].salary) - 1) * 100)}%`} detail="entre nível I e nível VI" tone="violet" icon={ArrowUpRight} /><Metric label="Premissa de encargos" value={`${draftEncargos}%`} detail="editável · aplicada no simulador" tone="orange" icon={ClipboardCheck} /></section>
-      <section className="panel-surface assumptions-editor"><div className="assumptions-editor-title"><div><span className="section-index">01</span><div><h2>Premissas salariais</h2><p>Valores de referência editáveis. O custo empresa é recalculado automaticamente.</p></div></div><div className="editor-toolbar"><input ref={fileInputRef} hidden type="file" accept=".xlsx" onChange={importSpreadsheet} /><a className="secondary-button" href="/templates/tsim-planilha-padrao.xlsx" download>Baixar padrão</a><button className="secondary-button" onClick={() => fileInputRef.current?.click()}>Importar planilha</button><label className="encargo-field"><span>Encargos (%)</span><input aria-label="Percentual de encargos" type="number" min="0" step="0.1" value={draftEncargos} onChange={(event) => setDraftEncargos(Math.max(0, Number(event.target.value) || 0))} /></label></div></div><div className="people-table-wrap"><table className="people-table editable-table"><thead><tr><th>Cargo</th><th>Nível</th><th>Salário base editável</th><th>Encargos</th><th>Custo empresa / mês</th><th>Fonte e vigência</th></tr></thead><tbody>{draftCargos.map((cargo) => { const total = custo(cargo, draftEncargos / 100); return <tr key={cargo.id}><td><strong>{cargo.name}</strong><small>{cargo.short}</small></td><td><span className={`level-tag level-${cargo.tone}`}>{cargo.level}</span></td><td><label className="salary-input"><span>R$</span><input aria-label={`Salário base ${cargo.short}`} type="number" min="0" step="0.01" value={cargo.salary} onChange={(event) => updateSalary(cargo.id, event.target.value)} /></label></td><td>{money(total - cargo.salary)}</td><td><strong>{money(total)}</strong></td><td><span className="source-type">{cargo.source || 'Base de referência'}</span><small className="source-validity">{cargo.validity || 'Vigência a confirmar'}</small></td></tr>; })}</tbody></table></div><div className="editor-actions"><div><strong>{importMessage || message || (hasChanges ? 'Há alterações ainda não salvas.' : 'Premissas vinculadas à fonte de referência.')}</strong><span>Salvamento local neste navegador</span></div><div><button className="secondary-button" onClick={resetChanges}>Restaurar referência</button><button className="primary-button editor-save" onClick={saveChanges} disabled={!hasChanges}>Salvar premissas</button></div></div></section>
+      <section className="panel-surface assumptions-editor"><div className="assumptions-editor-title"><div><span className="section-index">01</span><div><h2>Premissas salariais</h2><p>Valores de referência editáveis. O custo empresa é recalculado automaticamente.</p></div></div><div className="editor-toolbar"><input ref={fileInputRef} hidden type="file" accept=".xlsx" onChange={importSpreadsheet} /><button className="secondary-button" onClick={() => fileInputRef.current?.click()}>Importar Cargos e Salário</button><label className="encargo-field"><span>Encargos (%)</span><input aria-label="Percentual de encargos" type="number" min="0" step="0.1" value={draftEncargos} onChange={(event) => setDraftEncargos(Math.max(0, Number(event.target.value) || 0))} /></label></div></div><div className="people-table-wrap"><table className="people-table editable-table"><thead><tr><th>Cargo</th><th>Nível</th><th>Salário base editável</th><th>Encargos</th><th>Custo empresa / mês</th><th>Fonte e vigência</th></tr></thead><tbody>{draftCargos.map((cargo) => { const total = custo(cargo, draftEncargos / 100); return <tr key={cargo.id}><td><strong>{cargo.name}</strong><small>{cargo.short}</small></td><td><span className={`level-tag level-${cargo.tone}`}>{cargo.level}</span></td><td><label className="salary-input"><span>R$</span><input aria-label={`Salário base ${cargo.short}`} type="number" min="0" step="0.01" value={cargo.salary} onChange={(event) => updateSalary(cargo.id, event.target.value)} /></label></td><td>{money(total - cargo.salary)}</td><td><strong>{money(total)}</strong></td><td><span className="source-type">{cargo.source || 'Base de referência'}</span><small className="source-validity">{cargo.validity || 'Vigência a confirmar'}</small></td></tr>; })}</tbody></table></div><div className="editor-actions"><div><strong>{importMessage || message || (hasChanges ? 'Há alterações ainda não salvas.' : 'Premissas vinculadas à fonte de referência.')}</strong><span>Referência compartilhada do sistema</span></div><div><button className="secondary-button" onClick={resetChanges}>Descartar rascunho</button><button className="primary-button editor-save" onClick={saveChanges}>Salvar referência</button></div></div></section>
       <section className="people-grid people-insight-row"><aside className="panel-surface people-side-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Leitura da grade</h2><p>Indicadores recalculados</p></div></div></div><div className="grade-insights"><div><span>Menor salário base</span><strong>{money(draftCargos[0].salary)}</strong><small>{draftCargos[0].name}</small></div><div><span>Maior salário base</span><strong>{money(draftCargos.at(-1).salary)}</strong><small>{draftCargos.at(-1).name}</small></div><div><span>Maior salto entre níveis</span><strong>{money(draftCargos[1].salary - draftCargos[0].salary)}</strong><small>Auxiliar → Técnico II</small></div></div></aside><div className="panel-note people-note"><ClipboardCheck size={16} /><span>Configuração provisória em armazenamento local. Benefícios, ADM, BDI e custos de operação permanecem para o módulo Budget. {seedReferenceActive ? `Valores da grade de referência confirmados em ${cargoSourceConfirmation.confirmedAt}; revise vigência e fonte para alterações posteriores.` : 'Revise vigência e fonte dos valores editados ou importados antes de aprovação.'}</span></div></section>
-      <section className="panel-surface people-roster-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Pessoas da base local</h2><p>{people.length} registro(s) importado(s) neste perfil do navegador</p></div></div></div>{people.length ? <div className="dimension-table-wrap"><table className="dimension-table people-roster-table"><caption className="sr-only">Pessoas importadas da planilha</caption><thead><tr><th>Nome</th><th>Matrícula</th><th>Cargo</th><th>Região</th><th>Turno</th><th>Atividade</th><th>Status</th><th>Salário base</th></tr></thead><tbody>{people.map((person) => <tr key={person.id}><td><strong>{person.name}</strong><small>{person.email || 'E-mail não informado'}</small></td><td>{person.employeeId || '—'}</td><td>{person.role || '—'}{person.level ? <small>{person.level}</small> : null}</td><td>{person.region || '—'}</td><td>{person.shift || '—'}</td><td>{person.activity || '—'}</td><td>{person.status || '—'}</td><td>{person.salary === null || person.salary === undefined ? '—' : money(person.salary)}</td></tr>)}</tbody></table></div> : <div className="empty-state"><UsersRound size={22} /><strong>Nenhuma pessoa importada</strong><p>Use Configurações → Importar planilha completa para carregar a aba Pessoas neste perfil local.</p></div>}</section>
+      <section className="panel-surface people-roster-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Headcount por conta</h2><p>{people.length} registro(s) salvos no servidor</p></div></div></div>{people.length ? <div className="dimension-table-wrap"><table className="dimension-table people-roster-table"><caption className="sr-only">Pessoas importadas da planilha Headcount</caption><thead><tr><th>Nome</th><th>Matrícula</th><th>Cargo</th><th>Região</th><th>Turno</th><th>Atividade</th><th>Status</th></tr></thead><tbody>{people.map((person) => <tr key={person.id}><td><strong>{person.name}</strong></td><td>{person.employeeId || '—'}</td><td>{person.role || '—'}{person.level ? <small>{person.level}</small> : null}</td><td>{person.region || '—'}</td><td>{person.shift || '—'}</td><td>{person.segment || '—'}</td><td>{person.status || '—'}</td></tr>)}</tbody></table></div> : <div className="empty-state"><UsersRound size={22} /><strong>Nenhuma pessoa importada</strong><p>Importe a planilha Headcount da própria conta em Planilhas da conta.</p></div>}</section>
     </>
   );
 }
@@ -316,7 +298,7 @@ function OperationsView({ operations, onSave, calc, quantity }) {
     <section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> OPERAÇÃO</div><h1>Proteja a<br /><em>cobertura.</em></h1><p>Uma economia só é sustentável quando a equipe continua capaz de cumprir o volume e o SLA da operação.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Modelo operacional</div><strong>Campo · FTTH</strong><span>Região, turno e atividade</span><button onClick={save}>Salvar premissas <ChevronRight size={14} /></button></div></section>
     <section className="metric-grid"><Metric label="Headcount atual" value={dimensionResult.totalCurrent || draft.teamHeadcount} detail="soma das dimensões" tone="blue" icon={UsersRound} /><Metric label="Headcount requerido" value={dimensionResult.totalRequired || draft.requiredHeadcount} detail="soma das dimensões" tone="violet" icon={Activity} /><Metric label="Cobertura atual" value={`${dimensionResult.current.toFixed(1)}%`} detail="capacidade por dimensão" tone={dimensionResult.current >= safetyTarget ? 'green' : 'orange'} icon={Gauge} /><Metric label="Cobertura após movimento" value={`${dimensionResult.afterMovement.toFixed(1)}%`} detail={`risco global: ${risk}`} tone={dimensionResult.approvalBlocked ? 'orange' : 'green'} icon={ShieldCheck} /></section>
     <section className="ops-grid"><div className="panel-surface ops-editor"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Premissas globais</h2><p>Referência legada mantida para comparação com as dimensões.</p></div></div></div><div className="ops-fields"><label><span>Headcount atual</span><input type="number" min="0" value={draft.teamHeadcount} onChange={(event) => update('teamHeadcount', event.target.value)} /></label><label><span>Headcount requerido</span><input type="number" min="0" value={draft.requiredHeadcount} onChange={(event) => update('requiredHeadcount', event.target.value)} /></label><label><span>SLA alvo (%)</span><input type="number" min="0" max="100" value={draft.slaTarget} onChange={(event) => update('slaTarget', event.target.value)} /></label><label><span>Margem de segurança (%)</span><input type="number" min="0" max="100" value={draft.safetyBuffer} onChange={(event) => update('safetyBuffer', event.target.value)} /></label></div><div className="editor-actions"><div><strong>{message || 'A configuração controla o alerta de cobertura.'}</strong><span>Persistência local · módulo Ops</span></div><button className="primary-button editor-save" onClick={save}>Salvar operação</button></div></div><aside className="panel-surface ops-impact"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Impacto do cenário atual</h2><p>Movimento selecionado no simulador</p></div></div></div><div className="ops-impact-readout"><div><span>Economia mensal</span><strong>{money(calc.economy)}</strong></div><div><span>Promoções aplicadas</span><strong>{calc.appliedPromotions}</strong></div><div><span>Headcount após desligamentos</span><strong>{Math.max(0, dimensionResult.totalCurrent - quantity)}</strong></div></div><div className={`ops-risk-box risk-box-${risk.toLowerCase()}`}><ShieldCheck size={17} /><div><strong>Risco operacional: {risk}</strong><span>{draft.allocationMode === 'manual' ? 'Você define a lotação das posições movimentadas por dimensão.' : 'O T-Sim distribui as posições proporcionalmente ao HC atual de cada dimensão.'}</span></div></div></aside></section>
-    <section className="panel-surface ops-dimensions-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Dimensionamento por contexto</h2><p>Região, turno, atividade, capacidade e cobertura</p></div></div><div className="panel-heading-actions"><input ref={dimensionFileInputRef} hidden type="file" accept=".xlsx" onChange={importDimensions} /><a className="secondary-button" href="/templates/tsim-planilha-padrao.xlsx" download>Baixar padrão</a><button className="secondary-button" onClick={() => dimensionFileInputRef.current?.click()}>Importar dimensões</button><button className="text-action" onClick={addDimension}><Plus size={14} /> Adicionar dimensão</button></div></div><div className="dimension-allocation-controls"><span>Distribuição do movimento ({quantity} posição(ões))</span><div role="group" aria-label="Modo de distribuição do movimento"><button type="button" className={draft.allocationMode !== 'manual' ? 'is-active' : ''} onClick={() => toggleAllocationMode('auto')}>Automática proporcional</button><button type="button" className={draft.allocationMode === 'manual' ? 'is-active' : ''} onClick={() => toggleAllocationMode('manual')}>Ajustar por dimensão</button></div></div><div className="dimension-table-wrap"><table className="dimension-table"><caption className="sr-only">Dimensões operacionais editáveis</caption><thead><tr><th>Região</th><th>Turno</th><th>Atividade</th><th>HC atual</th><th>HC requerido</th><th>Cap./HC</th><th>Movimento</th><th>Cobertura</th><th>Fonte</th><th>Vigência</th><th /></tr></thead><tbody>{draft.dimensions.map((row, index) => { const result = dimensionResult.rows[index]; return <tr key={row.id}><td><input aria-label={`Região ${index + 1}`} value={row.region} onChange={(event) => updateDimension(index, 'region', event.target.value)} placeholder="Ex.: Bahia" /></td><td><input aria-label={`Turno ${index + 1}`} value={row.shift} onChange={(event) => updateDimension(index, 'shift', event.target.value)} placeholder="Ex.: Diurno" /></td><td><input aria-label={`Atividade ${index + 1}`} value={row.activity} onChange={(event) => updateDimension(index, 'activity', event.target.value)} placeholder="Ex.: Instalação" /></td><td><input aria-label={`HC atual ${index + 1}`} type="number" min="0" value={row.currentHeadcount} onChange={(event) => updateDimension(index, 'currentHeadcount', event.target.value)} /></td><td><input aria-label={`HC requerido ${index + 1}`} type="number" min="0" value={row.requiredHeadcount} onChange={(event) => updateDimension(index, 'requiredHeadcount', event.target.value)} /></td><td><input aria-label={`Capacidade por HC ${index + 1}`} type="number" min="0" step="0.1" value={row.capacityPerPerson} onChange={(event) => updateDimension(index, 'capacityPerPerson', event.target.value)} /></td><td><input aria-label={`Movimento alocado ${index + 1}`} type="number" min="0" max={row.currentHeadcount} step="1" disabled={draft.allocationMode !== 'manual'} value={draft.allocationMode === 'manual' ? row.scenarioMovement ?? 0 : result?.rowMovement ?? 0} onChange={(event) => updateDimension(index, 'scenarioMovement', event.target.value)} /></td><td><strong>{result?.afterMovement.toFixed(1) ?? '0.0'}%</strong><small>{result?.risk ?? 'Sem dados'}{result?.missingAllocation ? ' · rateio pendente' : ''}</small></td><td><input aria-label={`Fonte ${index + 1}`} value={row.source || ''} onChange={(event) => updateDimension(index, 'source', event.target.value)} placeholder="Planilha / sistema" /></td><td><input aria-label={`Vigência ${index + 1}`} value={row.validity || ''} onChange={(event) => updateDimension(index, 'validity', event.target.value)} placeholder="Ex.: out/2026" /></td><td><button className="icon-button" aria-label={`Remover dimensão ${index + 1}`} onClick={() => removeDimension(index)}><X size={14} /></button></td></tr>; })}</tbody></table></div><div className="panel-note"><Database size={16} /><span>{dimensionMessage || (dimensionResult.allocationMismatch ? `Movimento manual totaliza ${dimensionResult.allocatedMovement}; o cenário selecionado exige ${dimensionResult.requestedMovement}. Ajuste a distribuição antes de aprovar.` : dimensionResult.missingAllocation.length ? `${dimensionResult.missingAllocation.length} dimensão(ões) com região, turno, atividade, fonte, vigência ou dados obrigatórios pendentes. A cobertura fica visível, mas a aprovação permanece bloqueada até a correção.` : 'Distribuição do movimento aplicada. Confira região, turno, atividade, fonte e vigência antes de aprovar.')}</span></div></section>
+    <section className="panel-surface ops-dimensions-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Dimensionamento por contexto</h2><p>Região, turno, atividade, capacidade e cobertura</p></div></div><div className="panel-heading-actions"><input ref={dimensionFileInputRef} hidden type="file" accept=".xlsx" onChange={importDimensions} /><button className="secondary-button" onClick={() => dimensionFileInputRef.current?.click()}>Importar dimensões</button><button className="text-action" onClick={addDimension}><Plus size={14} /> Adicionar dimensão</button></div></div><div className="dimension-allocation-controls"><span>Distribuição do movimento ({quantity} posição(ões))</span><div role="group" aria-label="Modo de distribuição do movimento"><button type="button" className={draft.allocationMode !== 'manual' ? 'is-active' : ''} onClick={() => toggleAllocationMode('auto')}>Automática proporcional</button><button type="button" className={draft.allocationMode === 'manual' ? 'is-active' : ''} onClick={() => toggleAllocationMode('manual')}>Ajustar por dimensão</button></div></div><div className="dimension-table-wrap"><table className="dimension-table"><caption className="sr-only">Dimensões operacionais editáveis</caption><thead><tr><th>Região</th><th>Turno</th><th>Atividade</th><th>HC atual</th><th>HC requerido</th><th>Cap./HC</th><th>Movimento</th><th>Cobertura</th><th>Fonte</th><th>Vigência</th><th /></tr></thead><tbody>{draft.dimensions.map((row, index) => { const result = dimensionResult.rows[index]; return <tr key={row.id}><td><input aria-label={`Região ${index + 1}`} value={row.region} onChange={(event) => updateDimension(index, 'region', event.target.value)} placeholder="Ex.: Bahia" /></td><td><input aria-label={`Turno ${index + 1}`} value={row.shift} onChange={(event) => updateDimension(index, 'shift', event.target.value)} placeholder="Ex.: Diurno" /></td><td><input aria-label={`Atividade ${index + 1}`} value={row.activity} onChange={(event) => updateDimension(index, 'activity', event.target.value)} placeholder="Ex.: Instalação" /></td><td><input aria-label={`HC atual ${index + 1}`} type="number" min="0" value={row.currentHeadcount} onChange={(event) => updateDimension(index, 'currentHeadcount', event.target.value)} /></td><td><input aria-label={`HC requerido ${index + 1}`} type="number" min="0" value={row.requiredHeadcount} onChange={(event) => updateDimension(index, 'requiredHeadcount', event.target.value)} /></td><td><input aria-label={`Capacidade por HC ${index + 1}`} type="number" min="0" step="0.1" value={row.capacityPerPerson} onChange={(event) => updateDimension(index, 'capacityPerPerson', event.target.value)} /></td><td><input aria-label={`Movimento alocado ${index + 1}`} type="number" min="0" max={row.currentHeadcount} step="1" disabled={draft.allocationMode !== 'manual'} value={draft.allocationMode === 'manual' ? row.scenarioMovement ?? 0 : result?.rowMovement ?? 0} onChange={(event) => updateDimension(index, 'scenarioMovement', event.target.value)} /></td><td><strong>{result?.afterMovement.toFixed(1) ?? '0.0'}%</strong><small>{result?.risk ?? 'Sem dados'}{result?.missingAllocation ? ' · rateio pendente' : ''}</small></td><td><input aria-label={`Fonte ${index + 1}`} value={row.source || ''} onChange={(event) => updateDimension(index, 'source', event.target.value)} placeholder="Planilha / sistema" /></td><td><input aria-label={`Vigência ${index + 1}`} value={row.validity || ''} onChange={(event) => updateDimension(index, 'validity', event.target.value)} placeholder="Ex.: out/2026" /></td><td><button className="icon-button" aria-label={`Remover dimensão ${index + 1}`} onClick={() => removeDimension(index)}><X size={14} /></button></td></tr>; })}</tbody></table></div><div className="panel-note"><Database size={16} /><span>{dimensionMessage || (dimensionResult.allocationMismatch ? `Movimento manual totaliza ${dimensionResult.allocatedMovement}; o cenário selecionado exige ${dimensionResult.requestedMovement}. Ajuste a distribuição antes de aprovar.` : dimensionResult.missingAllocation.length ? `${dimensionResult.missingAllocation.length} dimensão(ões) com região, turno, atividade, fonte, vigência ou dados obrigatórios pendentes. A cobertura fica visível, mas a aprovação permanece bloqueada até a correção.` : 'Distribuição do movimento aplicada. Confira região, turno, atividade, fonte e vigência antes de aprovar.')}</span></div></section>
     <section className="panel-surface ops-source-panel"><div className="panel-heading compact"><div><span className="section-index">04</span><div><h2>Rastreabilidade da base</h2><p>Fonte e classificação preservadas por linha</p></div></div></div><div className="dimension-source-list">{draft.dimensions.map((row) => <div key={`${row.id}-source`}><strong>{row.region || 'Região pendente'} · {row.activity || 'Atividade pendente'}</strong><span>{row.source || 'Fonte pendente'} · {row.validity || 'Vigência pendente'} · capacidade {row.capacityClassification || 'não classificada'}</span></div>)}</div></section>
   </>;
 }
@@ -405,57 +387,42 @@ function AnalyticsView({ savedScenarios, operations }) {
   return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> ANALYTICS</div><h1>Custos e operação<br /><em>na mesma leitura.</em></h1><p>Use os dados operacionais da planilha de custos para contextualizar a decisão de pessoas e identificar concentração de impacto.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Fonte operacional</div><strong>{operations.basisSource || 'V.TAL · 2025'}</strong><span>{defaultReferenceActive ? `Valores confirmados em ${operationalSource.confirmedAt}` : 'Custos, headcount e dimensões do perfil atual'}</span><button onClick={() => setSourceMessage(defaultReferenceActive ? `${operationalSource.name}. ${operationalSource.confirmationNote}` : 'A fonte exibida vem da importação local mais recente.')}>Ver fonte <ChevronRight size={14} /></button>{sourceMessage && <small className="source-message">{sourceMessage}</small>}</div></section><section className="metric-grid"><Metric label="Custo operacional mensal" value={money(totalOperational)} detail="base de referência · / mês" tone="blue" icon={BarChart3} /><Metric label="HC base operacional" value={rateioHeadcount} detail="Custos Equipes · base oficial" tone="violet" icon={UsersRound} /><Metric label="HC Controle Local" value={comparisonHeadcount} detail={`comparação · diferença de ${headcountDifference} HC`} tone="orange" icon={TriangleAlert} /><Metric label="Cenários disponíveis" value={savedScenarios.length} detail="para cruzar com operação" tone="green" icon={Layers3} /></section><section className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Custos por contexto</h2><p>Valores mensais de referência da fonte operacional</p></div></div><span className="source-chip"><span /> Fonte rastreada</span></div><div className="analytics-bars">{costs.map((item) => <div className="analytics-bar-row" key={item.id}><div className="analytics-bar-label"><strong>{item.label}</strong><small>{item.headcount} HC informado · {item.classification} · {item.validity} · {item.source}</small></div><div className="analytics-track"><span style={{ width: `${((Number(item.monthlyCost) || 0) / maxCost) * 100}%` }} /></div><b>{money(Number(item.monthlyCost) || 0, true)}<small className="metric-unit"> / mês</small></b></div>)}</div><div className="panel-note"><Database size={16} /><span>{operations.basisSource || operationalSource.reconciliation} O rateio operacional e a cobertura usam {rateioHeadcount} HC. {defaultReferenceActive && operationalSource.confirmationNote}</span></div></section><section className="analytics-grid"><div className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Classes de equipe</h2><p>Custo de referência por equipe · mês</p></div></div></div><div className="class-table">{classRows.map((item) => <div key={item.id}><strong>{item.label}</strong><span>{item.headcount || 0} HC · {item.teamCount || '—'} equipes · {item.classification || 'Informada'} · {item.validity || 'A informar'}</span><b>{money(item.unitCost || 0)}<small className="metric-unit"> / equipe</small></b></div>)}</div></div><div className="panel-surface analytics-panel"><div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Leitura executiva</h2><p>Pontos para validação</p></div></div></div><div className="insight-list analytics-insights"><div className="insight-item"><span className="insight-number">01</span><div><strong>Contextos não devem ser misturados</strong><p>A grade de cargos usa 113% de encargos; a operação pode usar encargos, ADM e BDI próprios.</p></div></div><div className="insight-item"><span className="insight-number">02</span><div><strong>Base operacional definida</strong><p>O rateio usa a base oficial importada; referências comparativas permanecem visíveis.</p></div></div><div className="insight-item"><span className="insight-number">03</span><div><strong>ROI permanece estimado</strong><p>Sem histórico de retenção, produtividade e turnover, a recomendação deve permanecer indicativa.</p></div></div></div></div></section></>;
 }
 
-function SettingsView({ configuration, operations, savedScenarios, approvals, auditHistory, people, assumptions, profiles, activeProfileId, onProfileChange, onCreateProfile, onResetConfiguration, onClearWorkspace, onImportWorkbook }) {
-  const [message, setMessage] = useState('');
-
-  function reset() { onResetConfiguration(); setMessage('Premissas de cargos restauradas.'); }
-  function clear() { if (!window.confirm('Limpar configuração local, cenários, aprovações, histórico de decisões e operações deste perfil?')) return; onClearWorkspace(); setMessage('Dados locais do ambiente restaurados para a referência inicial.'); }
-  async function exportWorkspace() {
-    const XLSX = await import('xlsx');
-    const workbook = XLSX.utils.book_new();
-    const cargoRows = configuration.cargos.map((cargo) => ({ Cargo: cargo.name, Nível: cargo.level, 'Salário base': cargo.salary, 'Encargos (%)': configuration.encargos * 100, Fonte: cargo.source, Vigência: cargo.validity, Responsável: cargo.responsible }));
-    const scenarioRows = savedScenarios.map((scenario) => ({
-      ID: scenario.id, 'Nome do cenário': scenario.name, Data: scenario.savedAt,
-      'Cargo desligado': configuration.cargos.find((cargo) => cargo.id === scenario.dismissedRole)?.name || scenario.dismissedRole,
-      Quantidade: scenario.quantity,
-      'Cargo origem': configuration.cargos.find((cargo) => cargo.id === scenario.originRole)?.name || scenario.originRole,
-      'Cargo destino': configuration.cargos.find((cargo) => cargo.id === scenario.destinationRole)?.name || scenario.destinationRole,
-      'Promoções automáticas': scenario.automaticPromotions, 'Promoções manuais': scenario.manualMode ? scenario.manualPromotions : '',
-      'Saldo mensal': scenario.appliedBalance, 'Saldo anual': scenario.appliedAnnualBalance, 'Delta por promoção': scenario.delta,
-      'Cobertura operacional': scenario.operationalCoverage, Encargos: scenario.encargos, 'Tipo cenário': scenario.activeScenario, Fonte: scenario.source,
-      Status: approvals[scenario.id]?.status || 'Rascunho', Observação: scenario.importedNotes || '',
-    }));
-    const operationRows = (operations.dimensions || []).map((row) => ({ Região: row.region, Turno: row.shift, Atividade: row.activity, 'Classe de equipe': row.teamClass, 'HC atual': row.currentHeadcount, 'HC requerido': row.requiredHeadcount, 'Capacidade por HC': row.capacityPerPerson, 'SLA alvo (%)': row.slaTarget, 'Margem segurança (%)': row.safetyBuffer, 'Movimento alocado': row.scenarioMovement, Fonte: row.source, Vigência: row.validity }));
-    const costRows = (operations.costs || []).map((row) => ({ 'Classe de equipe': row.label, Contexto: row.context, 'HC atual': row.headcount, 'Custo mensal': row.monthlyCost, 'Custo por HC': row.unitCost, 'Quantidade de equipes': row.teamCount, 'Custo por equipe': row.teamUnitCost, Fonte: row.source, Vigência: row.validity }));
-    const headcountRows = (operations.headcountBases || []).map((row) => ({ 'Classe de equipe': row.label, 'HC atual': row.headcount, Fonte: row.basis, Classificação: row.classification }));
-    const historyRows = auditHistory.map((event) => ({
-      'ID do evento': event.id, 'ID do cenário': event.scenarioId, Cenário: event.scenarioName,
-      'Status anterior': event.previousStatus, 'Status novo': event.nextStatus, 'Registrado em': event.recordedAt,
-      Perfil: profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base local',
-      Quantidade: event.scenarioSnapshot?.quantity, 'Promoções automáticas': event.scenarioSnapshot?.automaticPromotions,
-      'Promoções aplicadas': event.scenarioSnapshot?.appliedPromotions, 'Saldo mensal': event.scenarioSnapshot?.appliedBalance,
-      'Saldo anual': event.scenarioSnapshot?.appliedAnnualBalance, 'Cobertura operacional': event.scenarioSnapshot?.operationalCoverage,
-      Encargos: event.scenarioSnapshot?.encargos, 'Delta por promoção': event.scenarioSnapshot?.delta, Fonte: event.scenarioSnapshot?.source,
-    }));
-    const addSheet = (name, rows) => XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows.length ? rows : [{ Informação: 'Sem registros neste perfil.' }]), name);
-    addSheet('Cargos', cargoRows);
-    addSheet('Pessoas', people.map((person) => ({ Nome: person.name, Matrícula: person.employeeId, Email: person.email, Cargo: person.role, Nível: person.level, Região: person.region, Turno: person.shift, Atividade: person.activity, Status: person.status, 'Data admissão': person.admissionDate, 'Salário base': person.salary, Observação: person.notes })));
-    addSheet('Premissas', assumptions.map((item) => ({ Parâmetro: item.key, Valor: item.value, Unidade: item.unit, Fonte: item.source, Vigência: item.validity, Responsável: item.owner, Observação: item.notes })));
-    addSheet('Operação', operationRows);
-    addSheet('Cenários', scenarioRows);
-    addSheet('Custos', costRows);
-    addSheet('Headcount', headcountRows);
-    addSheet('Histórico', historyRows);
-    addSheet('Leia-me', [{ Tópico: 'Backup T-Sim', Orientação: 'Arquivo Excel .xlsx gerado localmente. Para restaurar, use Configurações → Importar planilha completa.' }, { Tópico: 'Perfil', Orientação: profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base local' }, { Tópico: 'Exportado em', Orientação: new Date().toLocaleString('pt-BR') }]);
-    XLSX.writeFile(workbook, 'tsim-backup-workspace.xlsx');
-    setMessage('Backup Excel .xlsx exportado com histórico local de decisões.');
-  }
-  const workbookInputRef = useRef(null);
-  const [profileName, setProfileName] = useState('');
-  async function importWorkbook(event) { const file = event.target.files?.[0]; if (!file) return; try { if (!file.name.toLowerCase().endsWith('.xlsx')) throw new Error('Selecione uma planilha Excel no formato .xlsx.'); const result = await onImportWorkbook(file); const preserved = result.preservedSections?.length ? ` Seções sem registros válidos preservadas no perfil: ${result.preservedSections.join(', ')}.` : ''; const warnings = result.warnings?.length ? ` Atenção: ${result.warnings.join(' ')}` : ''; setMessage(`Planilha importada: ${result.counts.cargos} cargos, ${result.counts.people} pessoas, ${result.counts.assumptions} premissas, ${result.counts.dimensions} dimensões, ${result.counts.costs} custos, ${result.counts.scenarios} cenários e ${result.counts.auditEvents} eventos de histórico.${preserved}${warnings}`); } catch (error) { setMessage(error.message || 'Não foi possível importar a planilha completa.'); } finally { event.target.value = ''; } }
-  function createProfile() { const profile = onCreateProfile(profileName); if (profile) { setProfileName(''); setMessage(`Perfil local “${profile.name}” criado.`); } }
-  return <><section className="hero-intro"><div><div className="eyebrow"><span className="eyebrow-line" /> CONFIGURAÇÃO DE AMBIENTE</div><h1>Configure seu<br /><em>ambiente.</em></h1><p>Revise a base de cargos, premissas e operação deste ambiente de trabalho.</p></div><div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Ambiente atual</div><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base própria · local'}</strong><span>Dados disponíveis neste aparelho</span><button onClick={() => setMessage('O T-Sim está operando com a base própria local deste navegador.')}>Ver status <ChevronRight size={14} /></button></div></section><section className="settings-grid"><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Base própria e governança</h2><p>Dados carregados pelo usuário</p></div></div></div><div className="settings-list"><div><span>Ambiente</span><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base T-Sim · usuário atual'}</strong></div><div><span>Persistência</span><strong>localStorage · perfil local selecionado</strong></div><div><span>Compartilhamento externo</span><strong>Desativado</strong></div><div><span>Registros importados</span><strong>{people.length} pessoas · {assumptions.length} premissas</strong></div><div><span>Classificação dos resultados</span><strong>Informados, calculados e estimados</strong></div></div><div className="profile-switcher"><label><span>Perfil local</span><select value={activeProfileId} onChange={(event) => onProfileChange(event.target.value)}>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></label><div className="profile-create"><input value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Nome da nova base" /><button className="secondary-button" type="button" onClick={createProfile}>Criar perfil</button></div></div><div className="panel-note profile-limit-note"><ShieldCheck size={16} /><span>Perfis são uma organização local, não contas protegidas: qualquer pessoa com acesso a este navegador pode alternar entre eles. Não guarde aqui dados pessoais que exijam controle de acesso.</span></div></div><div className="panel-surface settings-panel"><div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Planilha padrão</h2><p>Alimente todas as áreas do seu ambiente</p></div></div></div><div className="settings-actions"><a className="secondary-button" href="/templates/tsim-planilha-padrao.xlsx" download>Baixar planilha padrão</a><input ref={workbookInputRef} hidden type="file" accept=".xlsx" onChange={importWorkbook} /><button className="secondary-button" onClick={() => workbookInputRef.current?.click()}>Importar planilha completa</button><button className="secondary-button" onClick={reset}>Restaurar cargos e encargos</button><button className="secondary-button" onClick={clear}>Limpar dados locais</button></div><div className="settings-backup"><button className="secondary-button" onClick={exportWorkspace}>Exportar backup Excel .xlsx</button><span>Inclui cargos, pessoas, premissas, operação, custos, headcount, cenários e histórico.</span></div>{message && <div className="settings-message"><Check size={15} />{message}</div>}<div className="panel-note"><ShieldCheck size={16} /><span>As abas Cargos, Pessoas, Premissas, Operação e Cenários são processadas localmente. Revise fonte, vigência e cobertura antes de salvar.</span></div></div></section></>;
+function SettingsView({ configuration, operations, accountWorkspaces = [], salaryReference = {} }) {
+  return <>
+    <section className="hero-intro">
+      <div><div className="eyebrow"><span className="eyebrow-line" /> ADMINISTRAÇÃO DO SISTEMA</div><h1>Referências<br /><em>e governança.</em></h1><p>Somente a conta administradora pode alterar cargos, salários, encargos e os módulos operacionais.</p></div>
+      <div className="hero-aside"><div className="hero-aside-label"><span className="pulse-dot" /> Referência ativa</div><strong>{configuration.cargos.length} cargos · {(configuration.encargos * 100).toFixed(1)}% encargos</strong><span>Grade não disponível para download de usuários comuns</span></div>
+    </section>
+    <section className="settings-grid">
+      <article className="panel-surface settings-panel">
+        <div className="panel-heading compact"><div><span className="section-index">01</span><div><h2>Cargos e salário</h2><p>Fonte, vigência e encargos da base global</p></div></div></div>
+        <div className="settings-list">
+          <div><span>Cargos registrados</span><strong>{configuration.cargos.length}</strong></div>
+          <div><span>Taxa de encargos</span><strong>{(configuration.encargos * 100).toFixed(1)}%</strong></div>
+          <div><span>Fonte cadastrada</span><strong>{configuration.cargos[0]?.source || 'Fonte a informar'}</strong></div>
+          <div><span>Vigência</span><strong>{configuration.cargos[0]?.validity || 'A confirmar'}</strong></div>
+          <div><span>Versão / responsável</span><strong>{salaryReference.version || 'A confirmar'} · {salaryReference.responsible || 'A confirmar'}</strong></div>
+          <div><span>Operação</span><strong>{operations.dimensions?.length || 0} dimensões · {operations.costs?.length || 0} linhas de custo</strong></div>
+        </div>
+        <p className="user-file-note">A alteração da grade é feita em Cargos e pessoas. A importação aceita somente a planilha Cargos e Salário, sem distribuir abas por outros módulos.</p>
+      </article>
+      <article className="panel-surface settings-panel">
+        <div className="panel-heading compact"><div><span className="section-index">02</span><div><h2>Arquivos disponíveis</h2><p>Finalidades independentes</p></div></div></div>
+        <div className="settings-list">
+          <div><span>Headcount</span><strong>Arquivo próprio por conta, 12 campos</strong></div>
+          <div><span>Cenário</span><strong>Documento gerado pelos cenários salvos</strong></div>
+          <div><span>Cargos e Salário</span><strong>Referência administrativa interna</strong></div>
+        </div>
+        <div className="panel-note"><ShieldCheck size={16} /><span>Os dados de headcount e cenários ficam vinculados à conta autenticada. Cargos e salários só podem ser alterados pela administração.</span></div>
+      </article>
+      <article className="panel-surface settings-panel admin-workspaces-panel">
+        <div className="panel-heading compact"><div><span className="section-index">03</span><div><h2>Bases das contas</h2><p>Headcount e cenários isolados por usuário</p></div></div></div>
+        {accountWorkspaces.length ? <div className="dimension-table-wrap"><table className="dimension-table"><caption className="sr-only">Contas com base Headcount ou cenários</caption><thead><tr><th>Perfil</th><th>Matrícula</th><th>Headcount</th><th>Cenários</th><th>Atualizado</th></tr></thead><tbody>{accountWorkspaces.map((item) => <tr key={item.user_id}><td>{item.full_name}</td><td>{item.registration || '—'}</td><td>{item.headcount?.length || 0}</td><td>{item.scenarios?.length || 0}</td><td>{item.updated_at ? new Date(item.updated_at).toLocaleString('pt-BR') : '—'}</td></tr>)}</tbody></table></div> : <p className="user-file-note">Nenhuma base de usuário foi carregada ainda.</p>}
+      </article>
+    </section>
+  </>;
 }
+
 function AiView({ calc, operations }) {
   const coverage = operations.dimensions?.length ? calculateDimensionCoverage(operations.dimensions, 1, operations.allocationMode) : calculateCoverage({ ...operations, quantity: 1 });
   const recommendation = calc.appliedBalance >= 0 && !coverage.approvalBlocked
@@ -487,7 +454,7 @@ function InstitutionalView({ onGoSimulator }) {
   );
 }
 
-function EntryExperience({ onEnter }) {
+function EntryExperience({ onEnter, startupError = '' }) {
   const [mode, setMode] = useState('login');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -496,6 +463,8 @@ function EntryExperience({ onEnter }) {
   const [credentials, setCredentials] = useState({ registration: '', pin: '' });
   const [request, setRequest] = useState({ registration: '', fullName: '', email: '', phone: '', company: '', role: '', pin: '', confirmPin: '' });
   const isRegistration = mode === 'register';
+
+  useEffect(() => { if (startupError) setError(startupError); }, [startupError]);
 
   useEffect(() => {
     let current = true;
@@ -536,7 +505,7 @@ function EntryExperience({ onEnter }) {
       } else if (result.status === 'denied') {
         setError('O acesso não foi aprovado. Consulte o e-mail informado no cadastro para ver a resposta.');
       } else if (result.status === 'approved') {
-        onEnter(result.user);
+        await onEnter(result.user);
       } else {
         throw new Error('Não foi possível confirmar o status deste acesso. Tente novamente.');
       }
@@ -764,16 +733,22 @@ function App() {
   const [activeScenario, setActiveScenario] = useState('balanced');
   const [manualMode, setManualMode] = useState(false);
   const [manualPromotions, setManualPromotions] = useState(null);
+  const [selectedDismissalIds, setSelectedDismissalIds] = useState([]);
+  const [selectedPromotionIds, setSelectedPromotionIds] = useState([]);
   const [showAssumptions, setShowAssumptions] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [activeView, setActiveView] = useState('overview');
   const [entryStage, setEntryStage] = useState('login');
+  const [entryError, setEntryError] = useState('');
   const [account, setAccount] = useState(null);
   const [savedScenarios, setSavedScenarios] = useState(() => loadSavedScenarios());
+  const [accountWorkspaces, setAccountWorkspaces] = useState([]);
+  const [salaryReference, setSalaryReference] = useState({});
   const [operations, setOperations] = useState(() => loadOperations(operationsDefaults));
   const [approvals, setApprovals] = useState(() => loadApprovals());
   const [auditHistory, setAuditHistory] = useState(() => loadApprovalHistory());
   const [people, setPeople] = useState(() => loadPeople());
+  const [headcountPlan, setHeadcountPlan] = useState({ campo: null, ga: null });
   const [assumptions, setAssumptions] = useState(() => loadImportedAssumptions());
   const [saveMessage, setSaveMessage] = useState('');
   const [theme, setTheme] = useState(() => window.localStorage.getItem('tsim.theme.v1') || 'light');
@@ -783,15 +758,43 @@ function App() {
     window.localStorage.setItem('tsim.theme.v1', theme);
   }, [theme]);
 
-  const enterWorkspace = useCallback((user) => {
-    setAccount(user || null);
-    setEntryStage('workspace');
-    setActiveView('settings');
+  const enterWorkspace = useCallback(async (user) => {
+    setEntryError('');
+    try {
+      const data = await loadAccountWorkspace();
+      const workspace = data.workspace || { headcount: [], scenarios: [] };
+      setAccount(user || null);
+      setPeople(Array.isArray(workspace.headcount) ? workspace.headcount : []);
+      setHeadcountPlan(normalizeHeadcountPlan(workspace.headcount_plan));
+      setSavedScenarios(Array.isArray(workspace.scenarios) ? workspace.scenarios : []);
+      setAccountWorkspaces(user?.isAdmin && Array.isArray(data.workspaces) ? data.workspaces : []);
+      setSalaryReference(data.reference?.payload || {});
+      if (data.reference?.payload) {
+        const payload = data.reference.payload;
+        setSalaryReference({ ...payload, updatedAt: data.reference.updated_at, updatedBy: data.reference.updated_by });
+        if (Array.isArray(payload.cargos) && Number.isFinite(payload.encargos)) {
+          const next = { cargos: payload.cargos, encargos: payload.encargos };
+          setConfiguration(next);
+          if (user?.isAdmin) saveConfiguration(next);
+        }
+      }
+      setActiveView(user?.isAdmin ? 'settings' : 'workspace');
+      setEntryStage('workspace');
+      return true;
+    } catch (error) {
+      setEntryError(error.message || 'Os dados da conta ainda não estão disponíveis.');
+      setEntryStage('login');
+      return false;
+    }
   }, []);
 
   async function handleLogout() {
     try { await fetch('/api/access/logout', { method: 'POST', credentials: 'same-origin' }); } catch { /* encerra o estado visível mesmo sem backend */ }
     setAccount(null);
+    setPeople([]);
+    setSavedScenarios([]);
+    setAccountWorkspaces([]);
+    setSalaryReference({});
     setActiveView('settings');
     setEntryStage('login');
   }
@@ -807,16 +810,24 @@ function App() {
     cargoList: configuredCargos,
     encargos: configuredEncargos,
   }), [activeScenario, configuredCargos, configuredEncargos, destinationRole, dismissedRole, manualMode, manualPromotions, originRole, quantity]);
+  const normalizePersonRole = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const matchesCargo = (role, cargo) => [cargo.name, cargo.short, cargo.level].some((label) => normalizePersonRole(role) === normalizePersonRole(label));
+  const dismissedPeople = people.filter((person) => matchesCargo(person.role, calc.dismissed));
+  const promotionPeople = people.filter((person) => matchesCargo(person.role, calc.origin));
 
   function handleSaveConfiguration(nextConfiguration) {
-    saveConfiguration(nextConfiguration);
-    setConfiguration(nextConfiguration);
-  }
-
-  function handleResetConfiguration() {
-    window.localStorage.removeItem(workspaceStorageKey('tsim.configuration.v1'));
-    const nextConfiguration = { cargos: cargos.map((cargo) => ({ ...cargo })), encargos: 1.13 };
-    setConfiguration(nextConfiguration);
+    const reference = {
+      ...nextConfiguration,
+      cargos: nextConfiguration.cargos.map((cargo) => ({ ...cargo, responsible: account?.fullName || cargo.responsible || 'A confirmar' })),
+      source: nextConfiguration.cargos[0]?.source || 'Cargos e Salário.xlsx',
+      validity: nextConfiguration.cargos[0]?.validity || 'Vigência informada no arquivo de referência',
+      version: new Date().toISOString(), responsible: account?.fullName || 'Administrador',
+    };
+    return saveAdminReference(reference).then(() => {
+      saveConfiguration(nextConfiguration);
+      setConfiguration(nextConfiguration);
+      setSalaryReference({ ...reference, updatedAt: new Date().toISOString() });
+    });
   }
 
   function handleSaveOperations(nextOperations) {
@@ -864,43 +875,21 @@ function App() {
   }
 
   async function handleImportWorkbook(file) {
-    if (!file.name.toLowerCase().endsWith('.xlsx')) throw new Error('Selecione uma planilha Excel no formato .xlsx.');
+    if (!file.name.toLowerCase().endsWith('.xlsx')) throw new Error('Selecione a planilha Headcount no formato .xlsx.');
     const XLSX = await import('xlsx');
-    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
-    const sheets = Object.fromEntries(workbook.SheetNames.map((name) => [name, XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: null })]));
-    const result = parseTsimWorkbook(sheets, { configuration, operations });
-    if (!result.counts.cargos && !result.counts.people && !result.counts.assumptions && !result.counts.dimensions && !result.counts.costs && !result.counts.scenarios && !result.counts.auditEvents) throw new Error('Nenhuma aba compatível ou linha preenchida foi encontrada.');
-    const nextConfiguration = result.configuration;
-    const nextOperations = normalizeOperations(result.operations, operationsDefaults);
-    saveConfiguration(nextConfiguration);
-    saveOperations(nextOperations);
-    const nextPeople = retainExistingIfImportEmpty(result.people, people);
-    const nextAssumptions = retainExistingIfImportEmpty(result.assumptions, assumptions);
-    const nextScenarios = retainExistingIfImportEmpty(result.scenarios, savedScenarios);
-    if (result.people.length) savePeople(nextPeople);
-    if (result.assumptions.length) saveImportedAssumptions(nextAssumptions);
-    if (result.scenarios.length) saveScenarioList(nextScenarios);
-    const nextApprovals = result.scenarios.length
-      ? Object.fromEntries(result.scenarios.filter((scenario) => scenario.importedStatus).map((scenario) => [scenario.id, { status: scenario.importedStatus.includes('aprov') ? 'Aprovado' : scenario.importedStatus.includes('envi') ? 'Enviado' : 'Rascunho', updatedAt: new Date().toISOString() }]))
-      : approvals;
-    if (result.scenarios.length) window.localStorage.setItem(workspaceStorageKey('tsim.approvals.v1'), JSON.stringify(nextApprovals));
-    if (result.auditHistory.length) saveApprovalHistory(result.auditHistory);
-    setConfiguration(nextConfiguration);
-    setOperations(nextOperations);
-    setPeople(nextPeople);
-    setAssumptions(nextAssumptions);
-    setSavedScenarios(nextScenarios);
-    setApprovals(nextApprovals);
-    if (result.auditHistory.length) setAuditHistory(loadApprovalHistory());
-    return {
-      ...result,
-      preservedSections: [
-        !result.people.length && 'Pessoas',
-        !result.assumptions.length && 'Premissas',
-        !result.scenarios.length && 'Cenários',
-        !result.auditHistory.length && 'Histórico',
-      ].filter(Boolean),
-    };
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+    if (workbook.SheetNames.length !== 1) throw new Error('A planilha Headcount deve ter somente uma aba.');
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
+    const parsed = parseHeadcountRows(rows);
+    if (parsed.errors.length) throw new Error(parsed.errors.slice(0, 8).join(' '));
+    await saveAccountWorkspace({ headcount: parsed.records, scenarios: savedScenarios, headcountPlan });
+    setPeople(parsed.records);
+    return { count: parsed.records.length };
+  }
+
+  async function handleSaveHeadcountPlan(nextPlan) {
+    await saveAccountWorkspace({ headcount: people, scenarios: savedScenarios, headcountPlan: nextPlan });
+    setHeadcountPlan(nextPlan);
   }
 
   function snapshotScenario() {
@@ -910,8 +899,10 @@ function App() {
       name: `${calc.dismissed.short} → ${calc.destination.short}`,
       dismissedRole,
       quantity,
+      dismissedEmployees: people.filter((person) => selectedDismissalIds.includes(person.id || person.employeeId)).map(({ employeeId, name }) => ({ employeeId, name })),
       originRole,
       destinationRole,
+      promotedEmployees: people.filter((person) => selectedPromotionIds.includes(person.id || person.employeeId)).map(({ employeeId, name }) => ({ employeeId, name })),
       activeScenario,
       manualMode,
       manualPromotions: manualMode ? calc.selectedManualPromotions : null,
@@ -929,22 +920,30 @@ function App() {
       appliedAnnualBalance: calc.appliedAnnualBalance,
       encargos: configuredEncargos,
       salarySnapshot: configuredCargos.map(({ id, salary }) => ({ id, salary })),
-      source: 'MVP local',
+      source: `T-Sim · ${account?.fullName || 'usuário'}`,
+      salaryReference: { source: salaryReference.source, validity: salaryReference.validity, version: salaryReference.version, responsible: salaryReference.responsible },
     };
   }
 
-  function handleSaveScenario() {
-    saveScenario(snapshotScenario());
-    const nextSavedScenarios = loadSavedScenarios();
-    setSavedScenarios(nextSavedScenarios);
-    setSaveMessage('Cenário salvo localmente');
+  async function handleSaveScenario() {
+    const saved = { id: crypto.randomUUID(), savedAt: new Date().toISOString(), ...snapshotScenario() };
+    const nextSavedScenarios = [saved, ...savedScenarios].slice(0, 500);
+    try {
+      await saveAccountWorkspace({ headcount: people, scenarios: nextSavedScenarios, headcountPlan });
+      setSavedScenarios(nextSavedScenarios);
+      setSaveMessage('Cenário salvo na sua conta.');
+    } catch (error) {
+      setSaveMessage(error.message || 'Não foi possível salvar o cenário.');
+    }
   }
 
   function restoreScenario(scenario) {
     setDismissedRole(scenario.dismissedRole);
     setQuantity(scenario.quantity);
+    setSelectedDismissalIds((scenario.dismissedEmployees || []).map((person) => person.employeeId));
     setOriginRole(scenario.originRole);
     setDestinationRole(scenario.destinationRole);
+    setSelectedPromotionIds((scenario.promotedEmployees || []).map((person) => person.employeeId));
     setActiveScenario(scenario.activeScenario);
     setManualMode(Boolean(scenario.manualMode));
     setManualPromotions(scenario.manualPromotions);
@@ -971,9 +970,10 @@ function App() {
   const maxChart = Math.max(...configuredCargos.map((cargo) => custo(cargo, configuredEncargos)));
   const salaryPremise = configuredCargos.find((cargo) => cargo.id === originRole) ?? configuredCargos[0];
   const currentSection = navItems.find((item) => item.id === activeView)?.label || 'Simulador';
-  const visibleNavItems = navItems.filter((item) => !item.adminOnly || Boolean(account?.isAdmin));
+  const visibleNavItems = account?.isAdmin ? navItems : navItems.filter((item) => item.userAllowed);
   const sectionTitle = {
     overview: 'Radar executivo',
+    workspace: 'Planilhas da sua conta',
     presentation: 'Plataforma e identidade',
     simulator: 'Movimentação de pessoas',
     people: 'Base de cargos e pessoas',
@@ -988,7 +988,7 @@ function App() {
   }[activeView];
 
   if (entryStage !== 'workspace') {
-    return <EntryExperience onEnter={enterWorkspace} />;
+    return <EntryExperience onEnter={enterWorkspace} startupError={entryError} />;
   }
 
   return (
@@ -1001,9 +1001,9 @@ function App() {
           <button className="mobile-close" onClick={() => setMobileNav(false)} aria-label="Fechar navegação"><X size={18} /></button>
         </div>
 
-        <button className="workspace-select" type="button" aria-label="Abrir Configuração de Ambiente" onClick={() => setActiveView('settings')}>
+        <button className="workspace-select" type="button" aria-label={account?.isAdmin ? 'Abrir configuração de ambiente' : 'Abrir planilhas da conta'} onClick={() => setActiveView(account?.isAdmin ? 'settings' : 'workspace')}>
           <div className="workspace-orb">TS</div>
-          <div className="workspace-copy"><span>Configuração de Ambiente</span><strong>{profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base T-Sim · Bahia'}</strong></div>
+          <div className="workspace-copy"><span>{account?.isAdmin ? 'Administração T-Sim' : 'Minha conta'}</span><strong>{account?.fullName || profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base T-Sim'}</strong></div>
           <ChevronRight size={15} aria-hidden="true" />
         </button>
 
@@ -1030,11 +1030,11 @@ function App() {
         <header className="topbar">
           <button className="menu-trigger" onClick={() => setMobileNav(true)} aria-label="Abrir navegação"><Menu size={21} /></button>
           <div className="breadcrumbs"><span>{currentSection}</span><ChevronRight size={14} /><strong>{sectionTitle}</strong></div>
-          <div className="topbar-actions"><span className="last-sync">Dados neste navegador <strong>salvamento local</strong></span><button className="theme-toggle" type="button" role="switch" aria-checked={theme === 'dark'} aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'} title={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'} onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}<span>{theme === 'dark' ? 'Claro' : 'Escuro'}</span></button><button className="help-button" aria-label="Ajuda"><CircleHelp size={18} /></button></div>
+          <div className="topbar-actions"><span className="last-sync">{account?.isAdmin ? 'Dados administrativos' : 'Dados da conta'} <strong>{account?.isAdmin ? 'referência no servidor · operações locais' : 'sincronizados no servidor'}</strong></span><button className="theme-toggle" type="button" role="switch" aria-checked={theme === 'dark'} aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'} title={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'} onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}<span>{theme === 'dark' ? 'Claro' : 'Escuro'}</span></button><button className="help-button" aria-label="Ajuda"><CircleHelp size={18} /></button></div>
         </header>
 
         <div className="content-wrap" id="workspace-content" tabIndex="-1">
-          {activeView === 'accounts' && account?.isAdmin ? <AccessManagementView /> : activeView === 'people' ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} people={people} onSaveConfiguration={handleSaveConfiguration} onResetConfiguration={handleResetConfiguration} saved={Boolean(window.localStorage.getItem(workspaceStorageKey('tsim.configuration.v1')))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} /> : activeView === 'presentation' ? <InstitutionalView onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'ops' ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} activeProfileName={profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base local'} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' ? <AnalyticsView savedScenarios={savedScenarios} operations={operations} /> : activeView === 'ai' ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' ? <SettingsView configuration={configuration} operations={operations} savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} people={people} assumptions={assumptions} profiles={profiles} activeProfileId={activeProfileId} onProfileChange={handleProfileChange} onCreateProfile={handleCreateProfile} onResetConfiguration={handleResetConfiguration} onClearWorkspace={handleClearWorkspace} onImportWorkbook={handleImportWorkbook} /> : <>
+          {!account?.isAdmin && !['workspace', 'simulator', 'scenarios'].includes(activeView) ? <UserWorkspaceView profileName={account?.fullName || 'Usuário'} people={people} scenarios={savedScenarios} cargos={configuredCargos} encargos={configuredEncargos} salaryReference={salaryReference} approvals={approvals} headcountPlan={headcountPlan} onImportHeadcount={handleImportWorkbook} onSaveHeadcountPlan={handleSaveHeadcountPlan} /> : activeView === 'workspace' ? <UserWorkspaceView profileName={account?.fullName || 'Usuário'} people={people} scenarios={savedScenarios} cargos={configuredCargos} encargos={configuredEncargos} salaryReference={salaryReference} approvals={approvals} headcountPlan={headcountPlan} onImportHeadcount={handleImportWorkbook} onSaveHeadcountPlan={handleSaveHeadcountPlan} /> : activeView === 'accounts' && account?.isAdmin ? <AccessManagementView /> : activeView === 'people' && account?.isAdmin ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} people={people} onSaveConfiguration={handleSaveConfiguration} saved={Boolean(window.localStorage.getItem(workspaceStorageKey('tsim.configuration.v1')))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' && account?.isAdmin ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} /> : activeView === 'presentation' && account?.isAdmin ? <InstitutionalView onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'ops' && account?.isAdmin ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' && account?.isAdmin ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} activeProfileName={profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base local'} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' && account?.isAdmin ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' && account?.isAdmin ? <AnalyticsView savedScenarios={savedScenarios} operations={operations} /> : activeView === 'ai' && account?.isAdmin ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' && account?.isAdmin ? <SettingsView configuration={configuration} operations={operations} accountWorkspaces={accountWorkspaces} salaryReference={salaryReference} savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} people={people} assumptions={assumptions} profiles={profiles} activeProfileId={activeProfileId} onProfileChange={handleProfileChange} onCreateProfile={handleCreateProfile} onClearWorkspace={handleClearWorkspace} onImportWorkbook={handleImportWorkbook} /> : <>
           <section className="hero-intro">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> SIMULADOR DE DECISÃO</div>
@@ -1066,11 +1066,16 @@ function App() {
               {savedScenarios.length > 0 && <div className="saved-scenarios-strip"><span className="saved-label"><BookOpen size={13} /> {savedScenarios.length} cenário{savedScenarios.length === 1 ? '' : 's'} salvo{savedScenarios.length === 1 ? '' : 's'}</span><div className="saved-scenario-list">{savedScenarios.slice(0, 3).map((scenario) => <button key={scenario.id} className="saved-scenario-chip" onClick={() => restoreScenario(scenario)} title={`Reabrir ${scenario.name}`}><span>{scenario.name}</span><small>{new Date(scenario.savedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</small></button>)}</div></div>}
 
               <div className="field-grid">
-                <label className="field field-wide"><span>Cargo desligado / vaga aberta</span><select value={dismissedRole} onChange={(event) => setDismissedRole(event.target.value)}>{configuredCargos.map((cargo) => <option key={cargo.id} value={cargo.id}>{cargo.name}</option>)}</select><small>Libera {money(calc.dismissedCost)} por posição / mês</small></label>
+                <label className="field field-wide"><span>Cargo desligado / vaga aberta</span><select value={dismissedRole} onChange={(event) => { setDismissedRole(event.target.value); setSelectedDismissalIds([]); }}>{configuredCargos.map((cargo) => <option key={cargo.id} value={cargo.id}>{cargo.name}</option>)}</select><small>Libera {money(calc.dismissedCost)} por posição / mês</small></label>
                 <label className="field"><span>Quantidade</span><div className="quantity-input"><button onClick={() => setQuantity(Math.max(1, quantity - 1))} aria-label="Diminuir quantidade">−</button><input type="number" min="1" max="20" value={quantity} onChange={(event) => setQuantity(Math.max(1, Math.min(20, Number(event.target.value) || 1)))} /><button onClick={() => setQuantity(Math.min(20, quantity + 1))} aria-label="Aumentar quantidade">+</button></div><small>Posições impactadas</small></label>
-                <label className="field"><span>Origem da promoção</span><select value={originRole} onChange={(event) => { const nextOrigin = event.target.value; const nextIndex = configuredCargos.findIndex((cargo) => cargo.id === nextOrigin); const destinationIndex = configuredCargos.findIndex((cargo) => cargo.id === destinationRole); setOriginRole(nextOrigin); if (destinationIndex <= nextIndex) setDestinationRole(configuredCargos[nextIndex + 1]?.id || nextOrigin); }}>{configuredCargos.map((cargo) => <option key={cargo.id} value={cargo.id}>{cargo.short}</option>)}</select><small>Custo atual {money(calc.originCost)}</small></label>
+                <label className="field"><span>Origem da promoção</span><select value={originRole} onChange={(event) => { const nextOrigin = event.target.value; const nextIndex = configuredCargos.findIndex((cargo) => cargo.id === nextOrigin); const destinationIndex = configuredCargos.findIndex((cargo) => cargo.id === destinationRole); setOriginRole(nextOrigin); setSelectedPromotionIds([]); if (destinationIndex <= nextIndex) setDestinationRole(configuredCargos[nextIndex + 1]?.id || nextOrigin); }}>{configuredCargos.map((cargo) => <option key={cargo.id} value={cargo.id}>{cargo.short}</option>)}</select><small>Custo atual {money(calc.originCost)}</small></label>
                 <label className="field"><span>Destino da promoção</span><select value={destinationRole} onChange={(event) => setDestinationRole(event.target.value)}>{configuredCargos.map((cargo, index) => <option key={cargo.id} value={cargo.id} disabled={index <= calc.originIndex}>{cargo.short}{index <= calc.originIndex ? ' · não elegível' : ''}</option>)}</select><small>{calc.promotionEligible ? `Custo projetado ${money(calc.destinationCost)}` : calc.promotionBlockReason}</small></label>
               </div>
+
+              {people.length > 0 && <div className="field-grid employee-selection-grid">
+                <label className="field"><span>Colaboradores desligados · opcional</span><select multiple size="4" value={selectedDismissalIds} onChange={(event) => setSelectedDismissalIds([...event.target.selectedOptions].map((option) => option.value).slice(0, quantity))}>{dismissedPeople.map((person) => <option key={person.id || person.employeeId} value={person.id || person.employeeId}>{person.name} · {person.employeeId}</option>)}</select><small>{dismissedPeople.length ? `Selecione até ${quantity} nome(s) da base.` : 'Nenhum registro da base corresponde ao cargo selecionado.'}</small></label>
+                <label className="field"><span>Colaboradores a promover · opcional</span><select multiple size="4" value={selectedPromotionIds} onChange={(event) => setSelectedPromotionIds([...event.target.selectedOptions].map((option) => option.value).slice(0, calc.appliedPromotions))}>{promotionPeople.map((person) => <option key={person.id || person.employeeId} value={person.id || person.employeeId}>{person.name} · {person.employeeId}</option>)}</select><small>{promotionPeople.length ? `Selecione até ${calc.appliedPromotions} nome(s) da origem.` : 'Nenhum registro da base corresponde ao cargo de origem.'}</small></label>
+              </div>}
 
               <div className="movement-readout">
                 <div className="movement-line"><span className="movement-node node-slate" /><div><span>Economia gerada</span><strong>{money(calc.economy)} <small>/ mês</small></strong></div><div className="movement-connector" /><div><span>Delta por promoção</span><strong className={calc.delta > 0 ? 'value-orange' : 'value-green'}>{calc.delta > 0 ? money(calc.delta) : 'Sem custo adicional'} <small>/ mês</small></strong></div><div className="movement-connector" /><div><span>Saldo disponível</span><strong className={calc.balance >= 0 ? 'value-green' : 'value-orange'}>{money(calc.balance)} <small>/ mês</small></strong></div></div>

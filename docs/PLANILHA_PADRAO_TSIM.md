@@ -1,44 +1,80 @@
-# Planilha padrão de alimentação do T-Sim
+# Contrato das planilhas do T-Sim
 
-Arquivo para download: [`public/templates/tsim-planilha-padrao.xlsx`](../public/templates/tsim-planilha-padrao.xlsx)
+O fluxo usa três arquivos independentes. Cada arquivo tem uma finalidade e uma permissão própria; não há uma planilha geral com várias abas para alimentar o ambiente.
 
-## Fluxo do usuário
+## Headcount Base Operacional Atual
 
-1. Baixe a planilha padrão em **Configurações**, **Base de pessoas** ou **Operação**.
-2. Substitua os exemplos pelos dados do ambiente do próprio usuário.
-3. Preencha a fonte, a vigência e o responsável em cada premissa usada.
-4. Use **Configurações → Importar planilha completa** para carregar Cargos, Pessoas, Premissas, Operação e Cenários de uma vez.
-5. Ou importe somente a aba Cargos em **Base de pessoas** e a aba Operação em **Dimensionamento por contexto**.
-6. Revise os alertas de cobertura e salve as premissas localmente.
-7. Se o mesmo navegador for usado por mais de uma pessoa, crie um **perfil local** separado em Configurações antes de importar.
+**Finalidade:** carregar a base de colaboradores que uma conta acompanha e alimentar a configuração operacional da própria conta.
 
-## Abas e colunas
+**Estrutura:** uma aba (`BASE OPERACIONAL`), uma linha de cabeçalho e exatamente 12 colunas nesta ordem:
 
-| Aba | Uso | Colunas principais |
+| Coluna | Campo | Preenchimento |
 |---|---|---|
-| Cargos | Grade salarial usada pelo motor | Cargo, Nível, Salário base, Encargos (%), Fonte, Vigência, Responsável, Observação |
-| Operação | Cobertura por região, turno e atividade | Região, Turno, Atividade, Classe de equipe, HC atual, HC requerido, Capacidade por HC, SLA alvo (%), Margem segurança (%), Fonte, Vigência, Responsável, Observação |
-| Pessoas | Cadastro local exibido em Cargos e pessoas | Nome, Matrícula, E-mail, Cargo, Nível, Região, Turno, Atividade, Status, Data admissão, Salário base, Observação |
-| Premissas | Parâmetros rastreáveis aplicados ao ambiente | Parâmetro, Valor, Unidade, Fonte, Vigência, Responsável, Observação |
-| Cenários | Registro local de simulações reabríveis | Nome do cenário, Data, cargos, quantidades, promoções automáticas e manuais, saldo e status |
-| Histórico | Registro de transições de status e snapshot da decisão | ID do evento, ID do cenário, status anterior/novo, data, quantidade, promoções, saldo e cobertura |
-| Custos / Headcount | Custos operacionais e bases de dimensionamento | Classe de equipe, HC, custo mensal/unitário, fonte e vigência |
-| Leia-me | Instruções de preenchimento e privacidade | Fluxo, unidades, validações e limitações |
+| 1 | `REGIONAL` | Nome da regional |
+| 2 | `UF` | Sigla do estado |
+| 3 | `MATRÍCULA` | Identificador tratado como texto; preserve zeros à esquerda |
+| 4 | `NOME` | Nome do colaborador |
+| 5 | `CARGO` | Cargo atual |
+| 6 | `NÍVEL` | Nível do cargo |
+| 7 | `GESTOR RESPONSÁVEL` | Nome do gestor |
+| 8 | `DATA ADMISSÃO` | Data válida do Excel |
+| 9 | `SEGUIMENTO` | Seguimento informado pela operação |
+| 10 | `TURNO ` | Turno; o cabeçalho mantém o espaço final do arquivo de referência |
+| 11 | `CARRO AGREGADO` | Informar o veículo ou `Não se aplica` |
+| 12 | `STATUS` | Situação do colaborador |
 
-## Regras de importação
+O modelo para download contém somente esses cabeçalhos, sem linhas de exemplo. Todas as 12 células de cada colaborador são obrigatórias. Cada matrícula deve aparecer uma única vez. A importação exige uma única aba e substitui a base da conta somente quando todas as linhas passam na validação; uma planilha inválida não altera os dados já salvos.
 
-- A importação de cargos usa a primeira aba da planilha, identifica a coluna **Salário base** (ou **Remuneração**) e associa o cargo pelo texto da primeira coluna. A aba **Cargos** da planilha padrão já vem com o formato completo e seis linhas de referência.
-- A importação de dimensões procura uma aba operacional e reconhece Região, Turno, Atividade, HC atual, HC requerido, Capacidade por HC, SLA, Margem de segurança, Fonte e Vigência. Linhas incompletas com headcount são preservadas para correção; linhas sem valores de HC são ignoradas e contabilizadas no retorno.
-- O sistema aceita importação exclusivamente de planilhas Excel `.xlsx`; exportações de parecer e backup também são `.xlsx`. O backup contém as abas Cargos, Pessoas, Premissas, Operação, Cenários, Custos, Headcount e Histórico. Para restaurá-lo, use **Configurações → Importar planilha completa**.
-- Para trazer um rateio manual do movimento simulado, inclua a coluna opcional **Movimento alocado** (ou **HC movimento**) na aba Operação. Na tela Operação, o usuário também pode editar manualmente a quantidade por dimensão; o total precisa corresponder à quantidade selecionada no simulador.
-- A importação completa também grava Pessoas, Premissas e Cenários no perfil local selecionado; os custos e bases de headcount operacionais importados passam a alimentar o módulo Analytics quando as colunas forem reconhecidas.
-- Ao importar um arquivo parcial, as áreas sem registros válidos (Pessoas, Premissas e Cenários) preservam os dados já existentes no perfil. Para substituir uma dessas áreas, importe dados válidos nela; para apagar o workspace, use a opção de limpeza em Configurações.
-- Na planilha operacional V.TAL, os custos da Sala Técnica são obtidos pelas linhas identificadas como custo total de Manutenção, Engenharia e Projetos, mantendo o HC e o valor mensal da fonte sem somar novamente seus componentes detalhados.
-- Linhas incompletas ficam visíveis como pendência; cobertura, fonte e vigência podem ser revisadas por dimensão, mas uma aprovação permanece bloqueada até que os campos obrigatórios e o rateio do movimento estejam consistentes.
-- Encargos, ROI, retenção, turnover, produtividade e payback permanecem classificados conforme a origem: informado, calculado ou estimado.
+Cada conta pode baixar o modelo vazio e exportar a base preenchida. Ambos os arquivos usam o nome `HEADCOUNT BASE OPERACIONAL ATUAL-{Nome do Perfil}.xlsx`. O conteúdo fica vinculado à conta autenticada, sem compartilhamento com outros usuários. Na exportação preenchida, as 12 colunas são mantidas na ordem acima.
 
-## Privacidade e armazenamento
+## Cenário
 
-O T-Sim não envia o conteúdo para TConnect, Supabase ou outro sistema. O arquivo é processado no navegador e os resultados ficam no `localStorage` do ambiente atual. Perfis locais organizam bases no mesmo navegador, mas não são contas nem barreiras de acesso. Para levar uma base a outro aparelho, exporte o backup Excel `.xlsx` ou a planilha preenchida e faça a importação manual no novo navegador.
+**Finalidade:** documento com os cenários que a própria conta salvou, para análise, envio por e-mail ou pedido de aprovação.
 
-O histórico local de decisões registra transições de status com data e snapshot do cenário, por perfil, e é incluído no backup Excel `.xlsx`. A autoria não é verificada; qualquer pessoa com acesso ao navegador pode alterar ou apagar esses dados. Esse registro é informativo e não substitui auditoria independente ou persistência em servidor.
+**Estrutura:** uma aba (`CENÁRIO`) com as 12 colunas do arquivo de referência:
+
+`NOME DO CENÁRIO`, `DATA`, `CARGO DESLIGADO`, `QUANTIDADE DESLIGADA`, `MATRÍCULA DESLIGAMENTO`, `NOME DESLIGAMENTO`, `CARGO ORIGEM`, `CARGO DESTINO`, `MATRÍCULA A PROMOVER`, `NOME A PROMOVER`, `SALDO MENSAL`, `OBSERVAÇÃO`.
+
+O download `CENÁRIO-{Nome do Perfil}.xlsx` contém uma linha por cenário salvo. Matrículas e nomes aparecem quando foram associados a pessoas da base Headcount. A observação registra promoções aplicadas, saldo anual, cobertura disponível, situação e a fonte, vigência, versão e responsável da referência salarial. Cenários com bloqueio orçamentário/operacional ou metadados de premissa incompletos ficam fora do arquivo. Se a conta ainda não salvou cenários, o arquivo contém apenas o cabeçalho.
+
+## Cargos e Salário
+
+**Finalidade:** referência do sistema para cargos, níveis, salário base, taxa de encargos, fonte, vigência e observações.
+
+Somente a conta administradora pode importar, editar, salvar ou restaurar essa referência. Usuários comuns não recebem link nem arquivo para baixar. A importação aceita uma única aba. Fonte e vigência acompanham cada cargo; a versão, data de alteração e responsável autenticado ficam no registro global do sistema.
+
+## Permissões
+
+| Recurso | Administrador | Usuário comum |
+|---|---|---|
+| Navegação e recursos do T-Sim | Acesso a todas as áreas | Planilhas da conta, Simulador e Cenários próprios |
+| Headcount | Administração e consulta | Importa, consulta e exporta apenas a própria base |
+| Cenários | Acesso aos recursos de administração | Cria, salva, consulta e exporta apenas os próprios |
+| Cargos e Salário | Consulta, importação e edição da referência global | Sem arquivo para download e sem permissão de alteração |
+| Operação, Budget, Analytics, Pareceres e Contas | Acesso administrativo | Sem acesso |
+
+## Tela de planilhas da conta
+
+- **Objetivo:** importar a base operacional própria e obter arquivos de trabalho separados.
+- **Decisões:** substituir a própria base Headcount depois da validação e baixar a versão vazia, a preenchida ou os cenários salvos.
+- **Público:** contas aprovadas não administrativas.
+- **Dados, unidades e fontes:** os 12 campos do Headcount são informados pelo usuário; os cenários são calculados no T-Sim; cargos e encargos vêm da referência global.
+- **Estados:** base vazia, validação em andamento, erro de planilha, inconsistência por linha, sucesso de importação e cenários ainda inexistentes.
+- **Responsividade e acessibilidade:** tabela com rolagem horizontal em telas estreitas, cabeçalho fixo, controles com nomes acessíveis e mensagens anunciadas por leitor de tela.
+- **Limitações:** a matrícula precisa ser única na importação; campos do Headcount não aceitam vazio; o envio de e-mail não é automático; o arquivo exportado é uma cópia no momento do download.
+
+### Planejamento de Headcount por categoria
+
+Na mesma tela da base Headcount, cada usuário registra o teto previsto para duas categorias: **Campo** (Auxiliar de Fibra Óptica, Oficial de Rede, Líder de Obras e os cinco cargos de Técnico de Fibra Óptica informados) e **GA** (Gestor de Área Fibra Óptica I). O previsto é salvo no workspace da própria conta.
+
+O atual é contado automaticamente apenas para colaboradores com status `Ativo`, `Ativa` ou `Em atividade`. Outros status aparecem como excluídos do cálculo; cargos fora dessas duas categorias são identificados e não entram no total. A tabela mostra Campo, GA e total, com atual, previsto e variação textual.
+
+O comparativo mensal é uma **estimativa** baseada no custo mensal com encargos da composição de cargos atual de cada categoria: `(HC atual − HC previsto) × custo médio atual por pessoa`. Valor positivo indica custo atual acima do teto estimado; valor negativo indica custo atual abaixo do teto estimado. Se não houver base ou correspondência salarial completa, o financeiro é informado como indisponível, nunca como zero. Benefícios, veículo, ADM, BDI e outros custos não estão incluídos. Fonte salarial e percentual de encargos vêm da referência global administrada; o mix atual é mantido como hipótese para estimar o previsto.
+
+O previsto é uma quantidade, sem período de projeção. A estimativa compara o retrato atual importado com essa quantidade e não projeta admissões, desligamentos ou mudanças de composição de cargos.
+
+## Armazenamento e ativação
+
+Headcount e cenários são armazenados no Supabase por `user_id`. As tabelas não concedem acesso direto às chaves `anon` ou `authenticated`; as rotas Vercel validam a sessão e determinam o escopo antes de ler ou gravar. A referência salarial fica em uma linha global e só pode ser alterada por sessão administrativa.
+
+A migração `20261009001801_user_workspaces_and_reference_data.sql` já está aplicada ao projeto Supabase T-Sim. A carga inicial registra a referência do arquivo `Cargos e Salário.xlsx` fornecido pelo responsável, com a vigência indicada conforme o próprio arquivo e o responsável ainda marcado como `A confirmar`.

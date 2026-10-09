@@ -9,18 +9,21 @@
 2. O T-Sim cria um usuário no Supabase Auth e uma solicitação com estado `pending`. O PIN só é enviado ao serviço Auth para ser armazenado como hash.
 3. O responsável em `tconnectsuporte@gmail.com` recebe a solicitação por e-mail e a revisa na área **Contas de acesso**.
 4. Aprovação ou negativa fica registrada com autor, horário, resultado e motivo. A pessoa recebe o resultado por e-mail, sem envio de senha.
-5. A conta aprovada entra com matrícula e PIN e chega primeiro à **Configuração de Ambiente**.
+5. A conta aprovada entra com matrícula e PIN. Usuários comuns chegam a **Planilhas da conta**; a administração chega à **Configuração de Ambiente**.
 
 ## Implementação
 
 - `api/access` contém as funções Vercel para sessão, login, logout, cadastro, decisões administrativas, reenvio de e-mail e provisionamento inicial do admin.
 - `supabase/migrations/20261008225200_access_accounts_and_rate_limits.sql` cria perfis, auditoria, tabela de limites e funções RPC. RLS está ativo; apenas o papel server-side pode acessar os registros.
+- `supabase/migrations/20261009001801_user_workspaces_and_reference_data.sql` cria a referência global de cargos e os workspaces isolados por conta; já aplicada ao projeto Supabase T-Sim. O código usa `/api/workspace`.
 - Sessões usam cookie `HttpOnly`, `SameSite=Strict`, `Secure` em produção e criptografia AES-256-GCM. A API confere no banco se a conta continua aprovada.
 - A matrícula é convertida em um endereço sintético interno para a autenticação do Supabase. E-mails de contato ficam separados e recebem as notificações do produto.
 - Limites de tentativas são aplicados no banco: até cinco logins por matrícula a cada 15 minutos, além de limite por origem; cadastro também tem limite por origem e matrícula.
 - E-mails são enviados por `tconnectsuporte@gmail.com` via SMTP TLS do Gmail. As respostas também retornam a esse endereço pelo cabeçalho `Reply-To`. Falhas são registradas e podem ser reenviadas no painel administrativo.
 - Matrícula e PIN nunca são registrados em logs; PIN nunca é enviado à administração ou por e-mail.
-- O menu da tela de entrada e do workspace chama **Configuração de Ambiente**.
+- A conta administradora tem acesso a todas as áreas e pode alterar a referência de cargos e salários. Usuários comuns acessam a base Headcount própria, o simulador e os próprios cenários; não podem abrir as áreas de gestão.
+- A planilha Headcount e a planilha Cenário recebem apenas os dados da conta autenticada. A planilha Cargos e Salário não é oferecida para download a usuários comuns.
+- Nesta fase, operações administrativas fora da referência salarial ainda dependem do navegador utilizado pelo administrador; não estão sincronizadas por conta no servidor.
 
 ## Pendências de infraestrutura
 
@@ -91,6 +94,8 @@ O Vite (`pnpm dev`) serve a interface, mas não executa funções Vercel. Para e
 - `POST /api/access/requests/{id}/review`: registra aprovação ou negativa e envia a decisão.
 - `POST /api/access/requests/{id}/notify`: reenvia uma notificação marcada como falha, apenas para admin.
 - `POST /api/access/bootstrap-admin`: cria a primeira conta administrativa uma única vez, usando segredo de provisionamento.
+- `GET /api/workspace`: carrega headcount e cenários da própria conta; uma sessão administrativa também pode listar as bases e cenários das contas.
+- `PUT /api/workspace`: salva headcount e cenários da própria conta; somente a sessão administrativa pode gravar a referência salarial global.
 
 ## Objetivo e limites das telas
 

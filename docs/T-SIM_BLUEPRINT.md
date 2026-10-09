@@ -367,3 +367,15 @@ O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O mod
 As rotas, variáveis, passos de ativação e limites estão documentados em [`ACESSO_E_CONTAS.md`](ACESSO_E_CONTAS.md).
 
 O importador segue preparado para planilhas `.xlsx` com os aliases listados, incluindo as estruturas de cargos e salários de promoção presentes nos anexos do projeto, além das fontes operacionais atualmente reconhecidas. Estruturas novas e específicas de outras empresas ainda precisam ser mapeadas a partir de uma planilha de exemplo.
+
+## 13. Fluxo separado de planilhas e permissões — 08/10/2026
+
+O contrato multiabas descrito nas seções anteriores foi substituído para o fluxo de contas autenticadas. As instruções em `docs/PLANILHA_PADRAO_TSIM.md` descrevem os três arquivos aprovados e prevalecem sobre o registro histórico deste status anterior.
+
+- `HEADCOUNT BASE OPERACIONAL ATUAL`: uma aba com os 12 cabeçalhos recebidos, sem linhas de exemplo. Usuários comuns importam e exportam apenas a base da própria conta; a importação exige os 12 campos por linha e matrículas únicas.
+- `CENÁRIO`: uma aba com o formato recebido. Usuários comuns criam cenários próprios, salvam e exportam somente os próprios registros. Cenários com bloqueios financeiros/operacionais ou sem fonte e vigência dos cargos não entram na exportação.
+- `Cargos e Salário`: referência global inicial carregada do arquivo fornecido. A conta administradora pode importar/editar e salvar. Contas comuns não recebem download nem permissão de alteração.
+- A conta administradora acessa todas as áreas; usuários comuns acessam somente Planilhas da conta, Simulador e Cenários próprios.
+- A migração `20261009001801_user_workspaces_and_reference_data.sql` protege workspaces, headcount previsto e referência por rotas Vercel autenticadas; RLS e grants impedem acesso direto pelo browser. Ela já está aplicada ao projeto Supabase T-Sim.
+- Headcount e cenários passam a ser persistidos por `user_id`. Outros dados de gestão administrativa fora da referência salarial continuam locais ao navegador do administrador nesta fase.
+- A tela **Planilhas da conta** declara objetivo de importação/exportação, público, unidades/fontes, estados, responsividade, acessibilidade e limites em `docs/PLANILHA_PADRAO_TSIM.md`.

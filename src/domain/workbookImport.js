@@ -56,6 +56,7 @@ export function parseCargoSheet(rows, cargos) {
   if (!parsed) return { cargos: null, encargos: null, count: 0, ids: [] };
   const { headers, body } = parsed;
   const nameCol = firstColumn(headers, 'cargo', 'funcao', 'nomecargo');
+  const levelCol = firstColumn(headers, 'nivel', 'level');
   const salaryCol = firstColumn(headers, 'salariobase', 'salariomensal', 'salarioatual', 'salario', 'remuneracao', 'remuneracaoatual', 'valor', 'valorsalario');
   const burdenCol = firstColumn(headers, 'encargos', 'encargospercentual', 'percentualdeencargos', 'percentualencargos');
   const sourceCol = firstColumn(headers, 'fonte', 'origem', 'source');
@@ -69,11 +70,24 @@ export function parseCargoSheet(rows, cargos) {
   for (const row of body) {
     const name = text(cell(row, nameCol));
     const salary = number(cell(row, salaryCol));
-    const id = roleId(name, next);
-    if (!id || salary === null || salary <= 0) continue;
-    const index = next.findIndex((cargo) => cargo.id === id);
+    if (!name || salary === null || salary <= 0) continue;
+    let id = roleId(name, next);
+    let index = next.findIndex((cargo) => cargo.id === id);
+    if (!id && levelCol >= 0 && text(cell(row, levelCol))) {
+      const slug = normalize(name);
+      id = `cargo-${slug}`;
+      index = next.findIndex((cargo) => cargo.id === id);
+      if (index < 0) {
+        next.push({ id, name, short: name, level: text(cell(row, levelCol)), salary, tone: 'slate' });
+        index = next.length - 1;
+      }
+    }
+    if (index < 0) continue;
     next[index] = {
       ...next[index], salary,
+      name,
+      short: next[index].short || name,
+      level: text(cell(row, levelCol)) || next[index].level,
       source: text(cell(row, sourceCol)) || 'Planilha importada · fonte a validar',
       validity: text(cell(row, validityCol)) || 'Vigência a confirmar',
       responsible: text(cell(row, ownerCol)),
@@ -83,6 +97,7 @@ export function parseCargoSheet(rows, cargos) {
     count += 1;
     importedIds.add(id);
   }
+  next.sort((a, b) => Number(a.level?.match(/\d+/)?.[0] || 0) - Number(b.level?.match(/\d+/)?.[0] || 0));
   return { cargos: count ? next : null, encargos: burden, count, ids: [...importedIds] };
 }
 
