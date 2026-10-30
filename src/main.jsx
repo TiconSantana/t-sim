@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   BarChart3,
   BookOpen,
+  CalendarDays,
   Check,
   ChevronRight,
   CircleHelp,
@@ -44,6 +45,7 @@ import { parseHeadcountRows } from './domain/headcount';
 import { normalizeHeadcountPlan } from './domain/headcountPlanning';
 import { buildExecutiveDashboard } from './domain/dashboard';
 import UserWorkspaceView from './components/UserWorkspaceView';
+import ScalePlanningView from './components/ScalePlanningView';
 import { loadAccountWorkspace, saveAccountWorkspace, saveAdminReference } from './lib/accountWorkspace';
 import './styles.css';
 
@@ -55,6 +57,7 @@ const navItems = [
   { id: 'presentation', label: 'Apresentação', icon: BookOpen, adminOnly: true },
   { id: 'people', label: 'Cargos e pessoas', icon: UsersRound, adminOnly: true },
   { id: 'ops', label: 'Operação', icon: Activity, adminOnly: true },
+  { id: 'scale', label: 'Escala de plantão', icon: CalendarDays, adminOnly: true },
   { id: 'reports', label: 'Pareceres', icon: FileText, adminOnly: true },
   { id: 'budget', label: 'Budget', icon: DollarSign, adminOnly: true },
   { id: 'analytics', label: 'Analytics', icon: LineChart, adminOnly: true },
@@ -570,6 +573,10 @@ function EntryExperience({ onEnter, onLocalReview, startupError = '' }) {
       setError('Digite a senha numérica de seis dígitos.');
       return;
     }
+    if (import.meta.env.DEV) {
+      setError('O login real não roda no Vite local. Use “Abrir revisão visual local” para revisar o T-Sim sem matrícula ou PIN.');
+      return;
+    }
     setBusy(true);
     try {
       const response = await fetch('/api/access/login', {
@@ -579,7 +586,11 @@ function EntryExperience({ onEnter, onLocalReview, startupError = '' }) {
       });
       if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('O serviço de acesso não está conectado. A senha não foi validada.');
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.message || 'O serviço de acesso não está conectado. A senha não foi validada.');
+      if (!response.ok) {
+        if (response.status === 401) throw new Error(result.message || 'Matrícula ou senha inválida.');
+        if (response.status === 429) throw new Error(result.message || 'Muitas tentativas. Aguarde antes de tentar novamente.');
+        throw new Error(result.message || 'O serviço de acesso está indisponível no momento. Tente novamente em instantes.');
+      }
       if (result.status === 'pending') {
         setMode('pending');
         setMessage('Sua solicitação ainda está em análise. Você receberá a decisão no e-mail informado no cadastro.');
@@ -1054,6 +1065,7 @@ function App() {
     people: 'Base de cargos e pessoas',
     scenarios: 'Biblioteca de cenários',
     ops: 'Cobertura operacional',
+    scale: 'Escala automatizada',
     reports: 'Pareceres e aprovação',
     budget: 'Orçamento e folha',
     analytics: 'Custos e indicadores',
@@ -1109,7 +1121,7 @@ function App() {
         </header>
 
         <div className="content-wrap" id="workspace-content" tabIndex="-1">
-          {!account?.isAdmin && !['workspace', 'simulator', 'scenarios'].includes(activeView) ? <UserWorkspaceView profileName={account?.fullName || 'Usuário'} people={people} scenarios={savedScenarios} cargos={configuredCargos} encargos={configuredEncargos} salaryReference={salaryReference} approvals={approvals} headcountPlan={headcountPlan} onImportHeadcount={handleImportWorkbook} onSaveHeadcountPlan={handleSaveHeadcountPlan} /> : activeView === 'workspace' ? <UserWorkspaceView profileName={account?.fullName || 'Usuário'} people={people} scenarios={savedScenarios} cargos={configuredCargos} encargos={configuredEncargos} salaryReference={salaryReference} approvals={approvals} headcountPlan={headcountPlan} onImportHeadcount={handleImportWorkbook} onSaveHeadcountPlan={handleSaveHeadcountPlan} /> : activeView === 'accounts' && account?.isAdmin ? <AccessManagementView /> : activeView === 'people' && account?.isAdmin ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} people={people} onSaveConfiguration={handleSaveConfiguration} saved={Boolean(window.localStorage.getItem(workspaceStorageKey('tsim.configuration.v1')))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' && account?.isAdmin ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} people={people} operations={operations} headcountPlan={headcountPlan} approvals={approvals} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} onGoOps={() => setActiveView('ops')} /> : activeView === 'presentation' && account?.isAdmin ? <InstitutionalView onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'ops' && account?.isAdmin ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' && account?.isAdmin ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} activeProfileName={profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base local'} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' && account?.isAdmin ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' && account?.isAdmin ? <AnalyticsView savedScenarios={savedScenarios} operations={operations} people={people} /> : activeView === 'ai' && account?.isAdmin ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' && account?.isAdmin ? <SettingsView configuration={configuration} operations={operations} accountWorkspaces={accountWorkspaces} salaryReference={salaryReference} savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} people={people} assumptions={assumptions} profiles={profiles} activeProfileId={activeProfileId} onProfileChange={handleProfileChange} onCreateProfile={handleCreateProfile} onClearWorkspace={handleClearWorkspace} onImportWorkbook={handleImportWorkbook} /> : <>
+          {!account?.isAdmin && !['workspace', 'simulator', 'scenarios'].includes(activeView) ? <UserWorkspaceView profileName={account?.fullName || 'Usuário'} people={people} scenarios={savedScenarios} cargos={configuredCargos} encargos={configuredEncargos} salaryReference={salaryReference} approvals={approvals} headcountPlan={headcountPlan} onImportHeadcount={handleImportWorkbook} onSaveHeadcountPlan={handleSaveHeadcountPlan} /> : activeView === 'workspace' ? <UserWorkspaceView profileName={account?.fullName || 'Usuário'} people={people} scenarios={savedScenarios} cargos={configuredCargos} encargos={configuredEncargos} salaryReference={salaryReference} approvals={approvals} headcountPlan={headcountPlan} onImportHeadcount={handleImportWorkbook} onSaveHeadcountPlan={handleSaveHeadcountPlan} /> : activeView === 'accounts' && account?.isAdmin ? <AccessManagementView /> : activeView === 'people' && account?.isAdmin ? <PeopleView cargoList={configuredCargos} encargos={configuredEncargos} people={people} onSaveConfiguration={handleSaveConfiguration} saved={Boolean(window.localStorage.getItem(workspaceStorageKey('tsim.configuration.v1')))} /> : activeView === 'scenarios' ? <ScenariosView savedScenarios={savedScenarios} onRestore={(scenario) => { restoreScenario(scenario); setActiveView('simulator'); }} onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'overview' && account?.isAdmin ? <OverviewView cargoList={configuredCargos} encargos={configuredEncargos} savedScenarios={savedScenarios} people={people} operations={operations} headcountPlan={headcountPlan} approvals={approvals} onGoSimulator={() => setActiveView('simulator')} onGoPeople={() => setActiveView('people')} onGoReports={() => setActiveView('reports')} onGoOps={() => setActiveView('ops')} /> : activeView === 'presentation' && account?.isAdmin ? <InstitutionalView onGoSimulator={() => setActiveView('simulator')} /> : activeView === 'scale' && account?.isAdmin ? <ScalePlanningView /> : activeView === 'ops' && account?.isAdmin ? <OperationsView operations={operations} onSave={handleSaveOperations} calc={calc} quantity={quantity} /> : activeView === 'reports' && account?.isAdmin ? <ReportsView savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} activeProfileName={profiles.find((profile) => profile.id === activeProfileId)?.name || 'Base local'} onApproval={handleApproval} onGoScenarios={() => setActiveView('scenarios')} currentSnapshot={snapshotScenario()} /> : activeView === 'budget' && account?.isAdmin ? <BudgetView calc={calc} cargoList={configuredCargos} encargos={configuredEncargos} /> : activeView === 'analytics' && account?.isAdmin ? <AnalyticsView savedScenarios={savedScenarios} operations={operations} people={people} /> : activeView === 'ai' && account?.isAdmin ? <AiView calc={calc} operations={operations} /> : activeView === 'settings' && account?.isAdmin ? <SettingsView configuration={configuration} operations={operations} accountWorkspaces={accountWorkspaces} salaryReference={salaryReference} savedScenarios={savedScenarios} approvals={approvals} auditHistory={auditHistory} people={people} assumptions={assumptions} profiles={profiles} activeProfileId={activeProfileId} onProfileChange={handleProfileChange} onCreateProfile={handleCreateProfile} onClearWorkspace={handleClearWorkspace} onImportWorkbook={handleImportWorkbook} /> : <>
           <section className="hero-intro">
             <div>
               <div className="eyebrow"><span className="eyebrow-line" /> SIMULADOR DE DECISÃO</div>

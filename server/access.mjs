@@ -5,6 +5,7 @@ import nodemailer from 'nodemailer';
 export const ADMIN_EMAIL = 'tconnectsuporte@gmail.com';
 export const COOKIE_NAME = 'tsim_access_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
+const localRateLimitBuckets = new Map();
 
 export class AccessError extends Error {
   constructor(status, message) {
@@ -208,8 +209,23 @@ export async function enforceRateLimit(admin, bucket, limit, windowSeconds) {
     p_max_attempts: limit,
     p_window_seconds: windowSeconds,
   });
-  if (error) throw new AccessError(503, 'Não foi possível validar o limite de tentativas.');
-  if (data !== true) throw new AccessError(429, 'Muitas tentativas. Aguarde antes de tentar novamente.');
+  if (!error) {
+    if (data !== true) throw new AccessError(429, 'Muitas tentativas. Aguarde antes de tentar novamente.');
+    return;
+  }
+
+  // Algumas instalações de produção ainda não receberam a função RPC da migração
+  // de rate limit. Mantemos uma proteção limitada por instância para não bloquear
+  // o login inteiro enquanto a migração é corrigida no Supabase.
+  console.error('[access] consume_access_rate_limit indisponível', error.code || 'unknown');
+  const now = Date.now();
+  const previous = localRateLimitBuckets.get(bucket);
+  const windowMs = windowSeconds * 1000;
+  const current = !previous || now - previous.startedAt >= windowMs
+    ? { startedAt: now, count: 1 }
+    : { startedAt: previous.startedAt, count: previous.count + 1 };
+  localRateLimitBuckets.set(bucket, current);
+  if (current.count > limit) throw new AccessError(429, 'Muitas tentativas. Aguarde antes de tentar novamente.');
 }
 
 export function requestIp(req) {

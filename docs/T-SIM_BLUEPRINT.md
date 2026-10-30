@@ -336,6 +336,8 @@ Ops e Pareceres:
 - O deploy público está conectado ao GitHub `TiconSantana/t-sim` e à Vercel `t-sim`.
 - O navegador guarda o workspace em `localStorage` e a tela Configurações permite exportar um backup Excel `.xlsx`; a restauração ocorre por **Importar planilha completa**.
 - A planilha padrão permite preencher cargos, operação, pessoas, premissas e cenários; cada usuário importa o arquivo no próprio ambiente.
+- Escala de plantão importa a aba `ESCALA CAMPO` e o banco de horas, classifica Fusão/Equipe L pelas linhas da fonte, preserva o trecho anterior ao corte e gera o ciclo a partir da data escolhida. A saída inclui escala, alertas de saldo e validação estrutural em abas separadas.
+- Escala de plantão usa o saldo acumulado da coluna K para negativação e a coluna M para orientar a recuperação; permite editar a meta DSR, janela dentro do ciclo, férias, equipe, dupla e carro, com destaque de dias, grupos e férias na tela e no Excel.
 
 O deploy público serve a mesma aplicação em `https://t-sim.vercel.app`. O modo local abre sem login e sem dependência de serviço externo. Cada navegador mantém sua própria base e pode transportar dados por backup Excel `.xlsx` ou pela planilha padrão.
 

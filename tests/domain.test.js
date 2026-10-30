@@ -4,6 +4,9 @@ import { cargos, ENCARGOS } from '../src/data/cargos.js';
 import { operationalDimensions } from '../src/data/operacao.js';
 import { calculateDimensionCoverage, calculateCoverage, validateScenarioForApproval } from '../src/domain/operations.js';
 import { calculateSimulation } from '../src/domain/simulation.js';
+import { bancoHorasSeed } from '../src/data/bancoHorasSeed.js';
+import { escalaSeed } from '../src/data/escalaSeed.js';
+import { buildFuelCreditCandidates, generateEscala, parseBancoHorasSeed, parseEscalaSeed, validateEscala } from '../src/domain/escala.js';
 
 test('calcula quatro promoções automáticas no cenário auxiliar para técnico II', () => {
   const result = calculateSimulation({
@@ -101,4 +104,70 @@ test('bloqueia aprovação quando a distribuição manual não corresponde ao mo
   const result = calculateDimensionCoverage(dimensions, 2, 'manual');
   assert.equal(result.approvalBlocked, false);
   assert.equal(result.allocatedMovement, 2);
+});
+
+test('importa a escala do ciclo 16→15 e classifica as famílias conforme as linhas da fonte', () => {
+  const scale = parseEscalaSeed(escalaSeed);
+  assert.equal(scale.employees.length, 56);
+  assert.equal(scale.cycleStart, '2026-10-16');
+  assert.equal(scale.cycleEnd, '2026-11-15');
+  assert.equal(scale.employees.find((person) => person.registration === '523191').className, 'Fusão');
+  assert.equal(scale.employees.find((person) => person.registration === '524070').className, 'Equipe L');
+  assert.equal(Object.keys(scale.employees[0].assignments).at(-1), '2026-11-15');
+});
+
+test('gera a nova escala preservando até 01/11 e sincronizando duplas', () => {
+  const scale = parseEscalaSeed(escalaSeed);
+  const bank = parseBancoHorasSeed(bancoHorasSeed);
+  const generated = generateEscala({ scale, bank, generationStart: '2026-11-02', holidays: ['2026-10-28'] });
+  assert.equal(generated.generationStart, '2026-11-02');
+  assert.equal(generated.employees.find((person) => person.registration === '523191').assignments['2026-11-01'], 'SA');
+  const pair = generated.employees.filter((person) => person.pair === 'F-20');
+  assert.equal(pair[0].assignments['2026-11-02'], pair[1].assignments['2026-11-02']);
+  assert.equal(generated.validation.errors.some((error) => error.includes('mais de um grupo de fusão')), false);
+});
+
+test('validação da escala exige duas duplas de Equipe L em SA', () => {
+  const scale = parseEscalaSeed(escalaSeed);
+  const generated = generateEscala({ scale, bank: parseBancoHorasSeed(bancoHorasSeed), generationStart: '2026-11-02' });
+  assert.equal(validateEscala(generated).errors.some((error) => error.includes('Equipe L')), false);
+});
+
+test('gera pré-lista de combustível somente para líder com carro em T ou SA no fim de semana', () => {
+  const generated = generateEscala({ scale: parseEscalaSeed(escalaSeed), bank: parseBancoHorasSeed(bancoHorasSeed), generationStart: '2026-11-02' });
+  const credits = buildFuelCreditCandidates(generated);
+  assert.ok(credits.length > 0);
+  assert.equal(credits.every((row) => ['T', 'SA'].includes(row.status)), true);
+  assert.equal(new Set(credits.map((row) => `${row.date}:${row.pair}`)).size, credits.length);
+});
+
+test('classifica negativação pelo saldo BH total acumulado da coluna K', () => {
+  const bank = parseBancoHorasSeed({ rows: [{ values: ['16/10/2026', '1', 'F', 'Pessoa', 'TECNICO', '', '', '', '00:00:00', '08:00:00', '-25:00:00', '00:00:00', '08:00:00', '0', '0%', 'Reduzindo'] }] });
+  assert.equal(bank.rows[0].alert.level, 'Crítico');
+  assert.equal(bank.rows[0].alertBasis, 'Saldo BH Total (Acumulado)');
+});
+
+test('usa meta DSR editável antes de permitir FBH e respeita janela final de geração', () => {
+  const scale = parseEscalaSeed(escalaSeed);
+  const bank = parseBancoHorasSeed(bancoHorasSeed);
+  const generated = generateEscala({ scale, bank, generationStart: '2026-11-02', generationEnd: '2026-11-05', dsrTarget: 2 });
+  assert.equal(generated.generationEnd, '2026-11-05');
+  assert.equal(generated.dsrTarget, 2);
+  const generatedKeys = generated.dates.filter((date) => date >= new Date(2026, 10, 2) && date <= new Date(2026, 10, 5)).map((date) => date.toISOString().slice(0, 10));
+  assert.equal(generatedKeys.length, 4);
+});
+
+test('aplica período de férias editável sem sobrescrever o restante da dupla', () => {
+  const scale = parseEscalaSeed(escalaSeed);
+  const generated = generateEscala({ scale, bank: parseBancoHorasSeed(bancoHorasSeed), generationStart: '2026-11-02', vacationRanges: [{ registration: '523191', name: 'ANDERSON CERQUEIRA MORAES', start: '2026-11-03', end: '2026-11-04' }] });
+  const person = generated.employees.find((item) => item.registration === '523191');
+  assert.equal(person.assignments['2026-11-03'], 'FÉRIAS');
+  assert.equal(person.assignments['2026-11-04'], 'FÉRIAS');
+});
+
+test('continua a rotação de SA no ciclo seguinte sem reiniciar no grupo anterior', () => {
+  const generated = generateEscala({ scale: parseEscalaSeed(escalaSeed), bank: parseBancoHorasSeed(bancoHorasSeed), generationStart: '2026-11-16', generationEnd: '2026-12-15', dsrTarget: 6 });
+  const nextDayGroups = new Set(generated.employees.filter((person) => person.className === 'Fusão' && person.assignments['2026-11-16'] === 'SA').map((person) => person.team));
+  assert.deepEqual([...nextDayGroups], ['EQUIPE A']);
+  assert.equal(generated.scheduleEnd, '2026-12-15');
 });
