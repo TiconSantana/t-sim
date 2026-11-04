@@ -58,7 +58,7 @@ function styleScaleSheet(sheet, scale, holidays, XLSX) {
     if (!cell) continue;
     const date = dates[col - headerStart];
     const headerFill = col >= headerStart && date && holidays.includes(formatDateKey(date)) ? 'F59E0B' : col >= headerStart && date && isWeekend(date) ? 'CBD5E1' : '465761';
-    cell.s = { fill: { fgColor: { rgb: headerFill } }, font: { bold: true, color: { rgb: headerFill === 'CBD5E1' ? '173042' : 'FFFFFF' } }, alignment: { wrapText: true, horizontal: 'center', vertical: 'center' }, border };
+    cell.s = { fill: { patternType: 'solid', fgColor: { rgb: headerFill } }, font: { bold: true, color: { rgb: headerFill === 'CBD5E1' ? '173042' : 'FFFFFF' } }, alignment: { wrapText: true, horizontal: 'center', vertical: 'center' }, border };
   }
   scale.employees.forEach((person, rowIndex) => {
     const row = rowIndex + 1;
@@ -67,7 +67,7 @@ function styleScaleSheet(sheet, scale, holidays, XLSX) {
       const cell = sheet[XLSX.utils.encode_cell({ r: row, c: col })];
       if (!cell) continue;
       const status = col >= headerStart ? person.assignments[formatDateKey(dates[col - headerStart])] : '';
-      cell.s = { fill: { fgColor: { rgb: team.fill } }, font: { color: { rgb: team.font }, bold: col >= headerStart && Boolean(status) }, alignment: { horizontal: col >= headerStart ? 'center' : 'left', vertical: 'center', wrapText: col === 5 }, border };
+      cell.s = { fill: { patternType: 'solid', fgColor: { rgb: team.fill } }, font: { color: { rgb: team.font }, bold: col >= headerStart && Boolean(status) }, alignment: { horizontal: col >= headerStart ? 'center' : 'left', vertical: 'center', wrapText: col === 5 }, border };
     }
   });
 }
@@ -204,7 +204,7 @@ export default function ScalePlanningView() {
   }
   async function exportWorkbook(scaleToExport = scale) {
     if (scaleToExport.validation.errors.length) { setMessage('Exportação bloqueada: corrija os erros estruturais.'); return; }
-    const XLSX = await import('xlsx');
+    const XLSX = (await import('xlsx-js-style')).default;
     const workbook = XLSX.utils.book_new();
     const start = readDate(generationStart); const end = readDate(generationEnd);
     const selectedDates = scaleToExport.dates.map(readDate).filter((date) => date >= start && date <= end);
@@ -238,15 +238,15 @@ export default function ScalePlanningView() {
       ['Erros', scaleToExport.validation.errors.join(' | ') || 'Nenhum'],
       ['Avisos', scaleToExport.validation.warnings.join(' | ') || 'Nenhum'],
     ]), 'VALIDACAO');
-    XLSX.writeFile(workbook, 'T-SIM_ESCALA_' + generationStart + '_A_' + generationEnd + '.xlsx');
+    XLSX.writeFile(workbook, 'T-SIM_ESCALA_' + generationStart + '_A_' + generationEnd + '.xlsx', { cellStyles: true });
   }
   async function exportBankWorkbook() {
-    const XLSX = await import('xlsx');
+    const XLSX = (await import('xlsx-js-style')).default;
     const workbook = XLSX.utils.book_new();
     const sheet = XLSX.utils.aoa_to_sheet(buildBankExportRows(bank));
     sheet['!cols'] = [14, 38, 24, 17, 19, 18, 16, 62].map((wch) => ({ wch }));
     XLSX.utils.book_append_sheet(workbook, sheet, 'BANCO_ALERTAS');
-    XLSX.writeFile(workbook, 'T-SIM_BANCO_HORAS_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+    XLSX.writeFile(workbook, 'T-SIM_BANCO_HORAS_' + new Date().toISOString().slice(0, 10) + '.xlsx', { cellStyles: true });
     setMessage('Banco de horas exportado para alimentar a próxima programação.');
   }
 
