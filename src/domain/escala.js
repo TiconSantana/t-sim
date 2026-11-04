@@ -8,11 +8,12 @@ const MONTHS = {
 
 export const escalaAssumptions = {
   source: 'Instruções do responsável · T-Sim',
-  version: 'escala-v1',
+  version: 'escala-v1.1',
   validity: 'Ciclo 16/10/2026 a 15/11/2026',
   responsible: 'A confirmar',
   fbhMinutes: MINUTES_PER_FBH,
   maxConsecutiveWorkDays: 6,
+  maxConsecutiveSaDays: 1,
   negativeAlertHours: { alert: 0, critical: -20, extremeCritical: -40 },
   weekdayLimits: { fusionMorning: 1, fusionNight: 1, equipeL: 1 },
   weekendMorningTechnicianLimit: 3,
@@ -155,6 +156,9 @@ function workStreak(person, date, assignments) {
 
 function setUnitStatus(unit, dateKey, status) { unit.forEach((person) => { if (person.assignments[dateKey] !== 'FÉRIAS') person.assignments[dateKey] = status; }); }
 function unitStatus(unit, dateKey) { return unit.find((person) => person.assignments[dateKey] !== 'FÉRIAS')?.assignments[dateKey] || 'FÉRIAS'; }
+function previousDateKey(date) { const previous = new Date(date); previous.setDate(previous.getDate() - 1); return formatDateKey(previous); }
+function unitHadStatusOnPreviousDay(unit, date, status) { const key = previousDateKey(date); return unit.some((person) => person.assignments[key] === status); }
+function groupHadStatusOnPreviousDay(employees, group, date, status) { const key = previousDateKey(date); return employees.some((person) => person.className === 'Fusão' && groupFromTeam(person.team) === group && person.assignments[key] === status); }
 
 function applyVacationRanges(employees, vacationRanges = [], cycleStart, cycleEnd) {
   const cycleDates = buildCycleDates(cycleStart, cycleEnd);
@@ -192,11 +196,19 @@ export function generateEscala({ scale, bank, generationStart = '2026-11-02', ge
   cycleDates.filter((date) => date >= startDate && date <= endDate).forEach((date, dayIndex) => {
     const dateKey = formatDateKey(date);
     let saGroup = rotation[(startRotationIndex + dayIndex) % rotation.length];
-    const groupPressure = rotation.map((group) => ({ group, due: employees.filter((person) => groupFromTeam(person.team) === group && person.assignments[dateKey] !== 'FÉRIAS' && workStreak(person, date, person.assignments) >= escalaAssumptions.maxConsecutiveWorkDays).length }));
+    const groupPressure = rotation.map((group) => ({ group, due: employees.filter((person) => person.className === 'Fusão' && groupFromTeam(person.team) === group && person.assignments[dateKey] !== 'FÉRIAS' && workStreak(person, date, person.assignments) >= escalaAssumptions.maxConsecutiveWorkDays).length }));
     if ((groupPressure.find((item) => item.group === saGroup)?.due || 0) > 0) saGroup = [...groupPressure].sort((a, b) => a.due - b.due || rotation.indexOf(a.group) - rotation.indexOf(b.group))[0]?.group || saGroup;
+    if (groupHadStatusOnPreviousDay(employees, saGroup, date, 'SA')) {
+      const rotationOrder = rotation.map((_, offset) => rotation[(startRotationIndex + dayIndex + offset) % rotation.length]);
+      saGroup = rotationOrder.find((group) => !groupHadStatusOnPreviousDay(employees, group, date, 'SA')) || saGroup;
+    }
     const availableLPairs = units.filter((unit) => unit[0].className === 'Equipe L' && !unit.some((person) => person.assignments[dateKey] === 'FÉRIAS')).map((unit) => unit[0].pair || unit[0].id);
     const lPairs = [...new Set(availableLPairs)];
-    const orderedLPairs = [...lPairs].sort((a, b) => {
+    const eligibleLPairs = lPairs.filter((pair) => {
+      const unit = units.find((item) => (item[0].pair || item[0].id) === pair);
+      return unit ? !unitHadStatusOnPreviousDay(unit, date, 'SA') : false;
+    });
+    const orderedLPairs = [...eligibleLPairs].sort((a, b) => {
       const dueA = units.find((unit) => (unit[0].pair || unit[0].id) === a)?.some((person) => workStreak(person, date, person.assignments) >= escalaAssumptions.maxConsecutiveWorkDays) ? 1 : 0;
       const dueB = units.find((unit) => (unit[0].pair || unit[0].id) === b)?.some((person) => workStreak(person, date, person.assignments) >= escalaAssumptions.maxConsecutiveWorkDays) ? 1 : 0;
       return dueA - dueB || ((dayIndex + lPairs.indexOf(a)) % Math.max(lPairs.length, 1)) - ((dayIndex + lPairs.indexOf(b)) % Math.max(lPairs.length, 1));
@@ -206,7 +218,8 @@ export function generateEscala({ scale, bank, generationStart = '2026-11-02', ge
       const lead = unit.find((person) => person.car) || unit[0];
       const activeMembers = unit.filter((person) => person.assignments[dateKey] !== 'FÉRIAS');
       if (!activeMembers.length) return;
-      const base = lead.className === 'Equipe L' ? (lSaPairs.has(lead.pair || lead.id) ? 'SA' : 'T') : (groupFromTeam(lead.team) === saGroup ? 'SA' : 'T');
+      const canReceiveSa = !unitHadStatusOnPreviousDay(unit, date, 'SA');
+      const base = lead.className === 'Equipe L' ? (canReceiveSa && lSaPairs.has(lead.pair || lead.id) ? 'SA' : 'T') : (canReceiveSa && groupFromTeam(lead.team) === saGroup ? 'SA' : 'T');
       setUnitStatus(activeMembers, dateKey, base);
     });
 
@@ -275,8 +288,8 @@ export function validateEscala(scale) {
     daySummary.push({ date: key, weekday: WEEKDAYS[date.getDay()], saGroups: [...saGroups], lSaPairs: [...lSaPairs], dsr: people.filter((person) => person.assignments[key] === 'DSR').length, fbh: people.filter((person) => person.assignments[key] === 'FBH').length });
   }
   (scale?.employees || []).forEach((person) => {
-    let streak = 0; let dsrCount = 0;
-    dates.forEach((date) => { const status = person.assignments[formatDateKey(date)]; if (status === 'DSR') { dsrCount += 1; streak = 0; } else if (statusIsWork(status)) { streak += 1; if ((!validationStart || date >= validationStart) && streak > escalaAssumptions.maxConsecutiveWorkDays) errors.push(`${person.name} · mais de 6 dias consecutivos até ${formatDateLabel(date)}.`); } });
+    let streak = 0; let dsrCount = 0; let previousStatus = null;
+    dates.forEach((date) => { const status = person.assignments[formatDateKey(date)]; if (status === 'SA' && previousStatus === 'SA' && (!validationStart || date >= validationStart)) errors.push(`${person.name} · SA em dias consecutivos até ${formatDateLabel(date)}.`); if (status === 'DSR') { dsrCount += 1; streak = 0; } else if (statusIsWork(status)) { streak += 1; if ((!validationStart || date >= validationStart) && streak > escalaAssumptions.maxConsecutiveWorkDays) errors.push(`${person.name} · mais de 6 dias consecutivos até ${formatDateLabel(date)}.`); } previousStatus = status; });
     const target = Number.isFinite(Number(scale?.dsrTarget)) ? Number(scale.dsrTarget) : dates.filter((date) => date.getDay() === 0 || (scale.holidays || []).includes(formatDateKey(date))).length;
     if (dsrCount < target) warnings.push(`${person.name} · ${dsrCount}/${target} DSR no ciclo.`);
   });
@@ -285,7 +298,7 @@ export function validateEscala(scale) {
 
 export function buildScaleExportRows(scale) {
   const dates = (scale?.dates || []).map((date) => new Date(date));
-  const header = ['EQUIPE', 'CARRO', 'FUNÇÃO', 'MATRICULA', 'DUPLADO', 'NOME DO COLABORADOR', 'CONTATO', ...dates.map((date) => `${formatDateLabel(date)}\n${WEEKDAYS[date.getDay()]}`)];
+  const header = ['EQUIPE', 'CARRO', 'FUNÇÃO', 'MATRICULA', 'DUPLADO', 'NOME DO COLABORADOR', 'CONTATO', ...dates.map((date) => `${formatDateLabel(date)}${WEEKDAYS[date.getDay()]}`)];
   return [header, ...(scale?.employees || []).map((person) => [person.team, person.car ? 'S' : 'N', person.role, person.registration, person.pair, person.name, person.contact, ...dates.map((date) => person.assignments[formatDateKey(date)] || '')])];
 }
 

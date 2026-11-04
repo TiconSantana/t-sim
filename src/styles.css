@@ -1199,9 +1199,9 @@ html[data-theme="dark"] .formula-box code {
 .scale-table th.is-weekend, .scale-table td.is-weekend { background: #f3f6fa; }
 .scale-table th.is-holiday, .scale-table td.is-holiday { background: #fff0dc; }
 .scale-table td.is-vacation { background: #f9e6ee; }
-.scale-table tr.scale-row-group-a td:first-child, .scale-table tr.scale-row-group-a td:nth-child(2), .scale-table tr.scale-row-group-a td:nth-child(3) { background: #eef8fc; }
-.scale-table tr.scale-row-group-b td:first-child, .scale-table tr.scale-row-group-b td:nth-child(2), .scale-table tr.scale-row-group-b td:nth-child(3) { background: #f0f4fb; }
-.scale-table tr.scale-row-group-c td:first-child, .scale-table tr.scale-row-group-c td:nth-child(2), .scale-table tr.scale-row-group-c td:nth-child(3) { background: #f6f0fb; }
+.scale-table tr.scale-row-group-a td:first-child, .scale-table tr.scale-row-group-a td:nth-child(2), .scale-table tr.scale-row-group-a td:nth-child(3) { background: #d5f4fb; }
+.scale-table tr.scale-row-group-b td:first-child, .scale-table tr.scale-row-group-b td:nth-child(2), .scale-table tr.scale-row-group-b td:nth-child(3) { background: #fff1ad; }
+.scale-table tr.scale-row-group-c td:first-child, .scale-table tr.scale-row-group-c td:nth-child(2), .scale-table tr.scale-row-group-c td:nth-child(3) { background: #d9f5df; }
 .scale-table tr.has-vacation td:first-child { box-shadow: inset 3px 0 0 #d789a3; }
 .scale-bank-panel, .scale-rules-panel { padding: 23px 25px 17px; min-width: 0; }
 .scale-alert-list { display: flex; flex-direction: column; gap: 7px; margin-top: 17px; }

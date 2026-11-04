@@ -50,24 +50,25 @@ function makeInitialState() {
 function styleScaleSheet(sheet, scale, holidays, XLSX) {
   const dates = scale.dates.map(readDate);
   const headerStart = 7;
-  dates.forEach((date, index) => {
-    const cell = sheet[XLSX.utils.encode_cell({ r: 0, c: headerStart + index })];
-    if (cell) cell.s = { fill: { fgColor: { rgb: holidays.includes(formatDateKey(date)) ? 'FDE2C4' : isWeekend(date) ? 'EAF0F7' : 'FFFFFF' } }, font: { bold: true, color: { rgb: '0A2541' } }, alignment: { wrapText: true, horizontal: 'center' } };
-  });
+  const teamStyles = { A: { fill: '12B8E8', font: '003246' }, B: { fill: 'FFC400', font: '3D2B00' }, C: { fill: '12B66A', font: '003D2A' } };
+  const border = { top: { style: 'thin', color: { rgb: '1D3B46' } }, bottom: { style: 'thin', color: { rgb: '1D3B46' } }, left: { style: 'thin', color: { rgb: '1D3B46' } }, right: { style: 'thin', color: { rgb: '1D3B46' } } };
+  const totalColumns = headerStart + dates.length;
+  for (let col = 0; col < totalColumns; col += 1) {
+    const cell = sheet[XLSX.utils.encode_cell({ r: 0, c: col })];
+    if (!cell) continue;
+    const date = dates[col - headerStart];
+    const headerFill = col >= headerStart && date && holidays.includes(formatDateKey(date)) ? 'F59E0B' : col >= headerStart && date && isWeekend(date) ? 'CBD5E1' : '465761';
+    cell.s = { fill: { fgColor: { rgb: headerFill } }, font: { bold: true, color: { rgb: headerFill === 'CBD5E1' ? '173042' : 'FFFFFF' } }, alignment: { wrapText: true, horizontal: 'center', vertical: 'center' }, border };
+  }
   scale.employees.forEach((person, rowIndex) => {
     const row = rowIndex + 1;
-    const groupColor = { A: 'EAF5FB', B: 'EEF3FA', C: 'F4EEFA' }[teamLetter(person.team)] || 'FFFFFF';
-    for (let col = 0; col < 3; col++) {
+    const team = teamStyles[teamLetter(person.team)] || { fill: 'FFFFFF', font: '173042' };
+    for (let col = 0; col < totalColumns; col += 1) {
       const cell = sheet[XLSX.utils.encode_cell({ r: row, c: col })];
-      if (cell) cell.s = { fill: { fgColor: { rgb: groupColor } } };
+      if (!cell) continue;
+      const status = col >= headerStart ? person.assignments[formatDateKey(dates[col - headerStart])] : '';
+      cell.s = { fill: { fgColor: { rgb: team.fill } }, font: { color: { rgb: team.font }, bold: col >= headerStart && Boolean(status) }, alignment: { horizontal: col >= headerStart ? 'center' : 'left', vertical: 'center', wrapText: col === 5 }, border };
     }
-    dates.forEach((date, index) => {
-      const status = person.assignments[formatDateKey(date)];
-      const cell = sheet[XLSX.utils.encode_cell({ r: row, c: headerStart + index })];
-      if (!cell) return;
-      const holiday = holidays.includes(formatDateKey(date));
-      cell.s = { fill: { fgColor: { rgb: status === 'FÉRIAS' ? 'F8E2EC' : holiday ? 'FDE2C4' : isWeekend(date) ? 'F3F6FA' : 'FFFFFF' } }, alignment: { horizontal: 'center' } };
-    });
   });
 }
 
@@ -197,7 +198,10 @@ export default function ScalePlanningView() {
     XLSX.utils.book_append_sheet(workbook, scaleSheet, 'ESCALA CAMPO');
     if (historicalDates.length) {
       const historicalScale = { ...scaleToExport, dates: historicalDates };
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(buildScaleExportRows(historicalScale)), 'HISTORICO_PRESERVADO');
+      const historicalSheet = XLSX.utils.aoa_to_sheet(buildScaleExportRows(historicalScale));
+      historicalSheet['!cols'] = [18, 9, 22, 12, 12, 38, 19, ...historicalDates.map(() => 10)].map((wch) => ({ wch }));
+      styleScaleSheet(historicalSheet, historicalScale, holidays, XLSX);
+      XLSX.utils.book_append_sheet(workbook, historicalSheet, 'HISTORICO_PRESERVADO');
     }
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(buildBankExportRows(bank)), 'BANCO_ALERTAS');
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(buildFuelCreditExportRows(selectedScale)), 'CREDITO_COMBUSTIVEL');

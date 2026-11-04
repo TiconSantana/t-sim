@@ -17,6 +17,7 @@ Público: Operações, GA e responsável pela aprovação da escala.
 - O trecho anterior à data de geração permanece igual ao arquivo importado. O padrão inicial é gerar a partir de 02/11/2026.
 - Um grupo de Fusão fica em `SA` por dia, seguindo a rotação base A→B→C. A rotação começa no grupo seguinte ao último grupo identificado em `SA` no trecho preservado e pode se adaptar em um dia para proteger o limite de seis dias consecutivos.
 - Equipe L mantém duas duplas em `SA` por dia, preferindo duplas disponíveis quando existe férias.
+- Nenhum colaborador pode receber `SA` em dois dias consecutivos. A geração evita repetir o sobreaviso do dia anterior e a validação bloqueia a exportação se a regra for violada.
 - O status é aplicado à dupla inteira. O colaborador com carro é tratado como líder da dupla.
 - `DSR` usa a quantidade de domingos e feriados do ciclo como meta padrão; a meta pode ser editada na tela e não ultrapassa seis dias consecutivos de trabalho.
 - O campo de feriados aceita várias datas no mesmo ciclo. Cada data adicionada entra no cálculo de DSR e recebe destaque na grade e no Excel; feriados não são confundidos com o intervalo de geração.
@@ -26,6 +27,7 @@ Público: Operações, GA e responsável pela aprovação da escala.
 - A janela de elaboração tem início e fim editáveis e pode atravessar três, quatro ou mais ciclos; cada ciclo continua organizado do dia 16 ao dia 15 seguinte.
 - A rotação de SA mantém continuidade entre ciclos: se o último dia terminar com C, o próximo dia começa com A.
 - A tela permite editar equipe A/B/C, dupla, carro agregado e períodos de férias. A exportação destaca dias de fim de semana/feriados, grupos, férias, dia abreviado e saldos K/M.
+- A aba `ESCALA CAMPO` mantém as colunas `EQUIPE`, `CARRO`, `FUNÇÃO`, `MATRICULA`, `DUPLADO`, `NOME DO COLABORADOR` e `CONTATO`, aplica preenchimento ciano para A, amarelo para B, verde para C e usa bordas em toda a grade.
 - O botão `Salvar configurações` grava a base atual no armazenamento local e gera imediatamente o Excel usando a janela escolhida, com nome `T-SIM_ESCALA_AAAA-MM-DD_A_AAAA-MM-DD.xlsx`. A aba `VALIDACAO` registra a janela, feriados, meta DSR e os horários de importação.
 - Sem uma nova planilha importada, a tela reutiliza a última base armazenada. Ao importar escala ou banco, a base local é substituída e a data/hora da última importação fica visível no rodapé da configuração e no Excel.
 - Fins de semana e feriados têm validação de cobertura de grupo e de duas duplas L.
