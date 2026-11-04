@@ -271,6 +271,74 @@ export function generateEscala({ scale, bank, generationStart = '2026-11-02', ge
   return result;
 }
 
+function dateKeyFromShortLabel(dates, label) {
+  return dates.find((date) => formatDateLabel(date) === label) ? formatDateKey(dates.find((date) => formatDateLabel(date) === label)) : null;
+}
+
+export function buildScaleSuggestions(scale) {
+  const dates = (scale?.dates || []).map((date) => new Date(date));
+  const people = scale?.employees || [];
+  return (scale?.validation?.errors || []).map((error, index) => {
+    const shortLabel = error.match(/até (\d{2}\/\d{2})/)?.[1] || error.match(/^(\d{2}\/\d{2})/)?.[1] || '';
+    const dateKey = dateKeyFromShortLabel(dates, shortLabel);
+    const name = error.split(' · ')[0];
+    const person = people.find((item) => item.name === name);
+    const base = { id: `scale-correction-${index}-${dateKey || 'unknown'}`, error, dateKey, name, kind: 'review', title: 'Revisão manual necessária', detail: 'Analise o alerta e confirme a alteração antes de continuar.', action: 'A validação será recalculada após a alteração.', canApply: false };
+    if (error.includes('mais de 6 dias consecutivos')) {
+      const unitKey = person ? keyForPerson(person) : null;
+      return { ...base, kind: 'work-streak', unitKey, title: 'Quebrar sequência de trabalho', detail: `${name} ultrapassou seis dias consecutivos até ${shortLabel}. A sugestão prioriza DSR para reiniciar a contagem e manter a regra do ciclo.`, action: `Aplicar DSR em ${shortLabel}${unitKey ? ` para a dupla ${unitKey}` : ''}.`, defaultStatus: 'DSR', options: ['DSR', 'FBH', 'T'], canApply: Boolean(unitKey && dateKey) };
+    }
+    if (error.includes('SA em dias consecutivos')) {
+      const unitKey = person ? keyForPerson(person) : null;
+      return { ...base, kind: 'sa-streak', unitKey, title: 'Separar dias de sobreaviso', detail: `${name} recebeu SA no dia anterior e novamente em ${shortLabel}. A recomendação é retirar o segundo SA e usar DSR para preservar a regra.`, action: `Aplicar DSR em ${shortLabel}${unitKey ? ` para a dupla ${unitKey}` : ''}.`, defaultStatus: 'DSR', options: ['DSR', 'T'], canApply: Boolean(unitKey && dateKey) };
+    }
+    if (error.includes('mais de um grupo de fusão em SA')) {
+      const groups = error.match(/\(([^)]+)\)/)?.[1]?.split(',').map((item) => item.trim()).filter(Boolean) || [];
+      const keepGroup = groups[0] || '';
+      return { ...base, kind: 'fusion-duplicate', keepGroup, title: 'Manter um único grupo de Fusão', detail: `Há mais de um grupo em SA em ${shortLabel}. A sugestão mantém ${keepGroup || 'o primeiro grupo identificado'} e devolve os demais para T.`, action: `Manter ${keepGroup || 'um grupo'} em SA em ${shortLabel}.`, canApply: Boolean(keepGroup && dateKey) };
+    }
+    if (error.includes('Equipe L com')) {
+      return { ...base, kind: 'equipe-l-coverage', title: 'Completar cobertura da Equipe L', detail: `A Equipe L ficou abaixo de duas duplas em SA em ${shortLabel}. A sugestão procura duplas disponíveis sem repetir SA no dia anterior.`, action: `Selecionar até duas duplas elegíveis em ${shortLabel}.`, canApply: Boolean(dateKey) };
+    }
+    if (error.includes('dupla ') && error.includes('status divergente')) {
+      const pair = error.match(/dupla ([^ ]+) com/)?.[1] || '';
+      return { ...base, kind: 'pair-align', unitKey: pair, title: 'Alinhar o status da dupla', detail: `Os integrantes da dupla ${pair} estão com status diferentes em ${shortLabel}. A sugestão copia o status predominante para os integrantes ativos.`, action: `Sincronizar a dupla ${pair} em ${shortLabel}.`, canApply: Boolean(pair && dateKey) };
+    }
+    return base;
+  });
+}
+
+export function applyScaleSuggestion(scale, suggestion) {
+  const employees = (scale?.employees || []).map((person) => ({ ...person, assignments: { ...(person.assignments || {}) } }));
+  const dates = (scale?.dates || []).map((date) => new Date(date));
+  const units = unitsForEmployees(employees);
+  const unitFor = (unitKey) => units.find((unit) => (unit[0].pair || unit[0].id) === unitKey);
+  const selectedDate = suggestion?.dateKey;
+  if (!selectedDate) return { ...scale, employees, validation: validateEscala({ ...scale, employees }) };
+  if (suggestion.kind === 'work-streak' || suggestion.kind === 'sa-streak') {
+    const unit = unitFor(suggestion.unitKey);
+    if (unit) setUnitStatus(unit, selectedDate, suggestion.status || suggestion.defaultStatus || 'DSR');
+  } else if (suggestion.kind === 'fusion-duplicate') {
+    employees.forEach((person) => { if (person.className === 'Fusão' && person.assignments[selectedDate] === 'SA' && groupFromTeam(person.team) !== suggestion.keepGroup) person.assignments[selectedDate] = 'T'; });
+  } else if (suggestion.kind === 'equipe-l-coverage') {
+    const lUnits = units.filter((unit) => unit[0].className === 'Equipe L' && !unit.some((person) => person.assignments[selectedDate] === 'FÉRIAS'));
+    const current = lUnits.filter((unit) => unitStatus(unit, selectedDate) === 'SA');
+    const eligible = lUnits.filter((unit) => !unitHadStatusOnPreviousDay(unit, dates.find((date) => formatDateKey(date) === selectedDate), 'SA'));
+    const chosen = [...current, ...eligible.filter((unit) => !current.includes(unit))].slice(0, 2);
+    lUnits.forEach((unit) => setUnitStatus(unit, selectedDate, chosen.includes(unit) ? 'SA' : 'T'));
+  } else if (suggestion.kind === 'pair-align') {
+    const unit = unitFor(suggestion.unitKey);
+    if (unit) {
+      const statuses = unit.map((person) => person.assignments[selectedDate]).filter((status) => status && status !== 'FÉRIAS');
+      const status = statuses.sort((a, b) => statuses.filter((item) => item === b).length - statuses.filter((item) => item === a).length)[0] || 'T';
+      setUnitStatus(unit, selectedDate, status);
+    }
+  }
+  const next = { ...scale, employees };
+  next.validation = validateEscala(next);
+  return next;
+}
+
 export function validateEscala(scale) {
   const dates = (scale?.dates || []).map((date) => new Date(date));
   const validationStart = scale?.generationStart ? toLocalDate(scale.generationStart) : dates[0];

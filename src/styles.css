@@ -1253,12 +1253,32 @@ html[data-theme="dark"] .formula-box code {
 .scale-footer-summary b { color: var(--ink-800); }
 .scale-validation-panel { border-color: #e8b3a3; background: #fff9f7; }
 .scale-validation-panel ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 20px; margin: 16px 0 0; padding-left: 18px; color: #9d3d2a; font-size: 10px; line-height: 1.45; }
+.scale-correction-list { display: grid; gap: 8px; margin-top: 16px; }
+.scale-correction-intro { display: flex; flex-direction: column; gap: 3px; color: #7f3428; font-size: 10px; line-height: 1.4; }
+.scale-correction-intro strong { color: #8f3025; font-size: 11px; }
+.scale-correction-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 11px; border: 1px solid #e8b3a3; border-radius: 9px; background: rgba(255,255,255,.72); }
+.scale-correction-card > div:first-child { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.scale-correction-card strong { color: #732d26; font-size: 10px; }
+.scale-correction-card span, .scale-correction-card small { color: #7f5148; font-size: 9px; line-height: 1.4; }
+.scale-correction-card small { color: #934234; }
+.scale-correction-actions { display: flex; align-items: center; gap: 6px; }
+.scale-correction-actions select { min-width: 62px; height: 31px; padding: 0 6px; border: 1px solid #d29b8d; border-radius: 6px; color: #5d261f; background: #fff; font-size: 9px; font-weight: 700; }
+.scale-correction-actions .secondary-button { min-height: 31px; padding: 0 9px; white-space: nowrap; }
+.scale-correction-manual { align-self: center; color: #8d5b51; font-size: 9px; font-weight: 700; white-space: nowrap; }
 html[data-theme="dark"] .scale-source-readout, html[data-theme="dark"] .scale-table th { background: #0d2a40; }
 html[data-theme="dark"] .scale-source-readout strong, html[data-theme="dark"] .scale-table td, html[data-theme="dark"] .scale-alert-row strong, html[data-theme="dark"] .scale-empty strong { color: var(--ink-950); }
 html[data-theme="dark"] .scale-alert-row { background: rgba(255,154,69,.12); }
 html[data-theme="dark"] .scale-alert-extreme { background: rgba(204,65,56,.15); }
 html[data-theme="dark"] .scale-table td.is-generated { background: rgba(71,201,255,.07); }
 html[data-theme="dark"] .scale-validation-panel { background: rgba(204,65,56,.12); border-color: rgba(255,154,69,.35); }
+html[data-theme="dark"] .scale-correction-intro { color: #f0b4a5; }
+html[data-theme="dark"] .scale-correction-intro strong, html[data-theme="dark"] .scale-correction-card strong { color: #ffd0c4; }
+html[data-theme="dark"] .scale-correction-card { border-color: rgba(255,154,69,.35); background: rgba(52, 24, 28, .72); }
+html[data-theme="dark"] .scale-correction-card span, html[data-theme="dark"] .scale-correction-card small, html[data-theme="dark"] .scale-correction-manual { color: #e9b8ad; }
+html[data-theme="dark"] .scale-correction-card small { color: #ffc2b4; }
+html[data-theme="dark"] .scale-correction-actions select { color: #0b2945; background: #f7fbfd; border-color: #e0a38f; }
+html[data-theme="dark"] .scale-bank-actions { flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 680px) { .scale-correction-card { grid-template-columns: 1fr; }.scale-correction-actions { justify-content: flex-start; flex-wrap: wrap; } }
 
 /* Escala: contraste reforçado para leitura de saldos, edição e grade diária. */
 .scale-editor-table-wrap, .scale-bank-table-wrap, .scale-table-wrap { border-color: #9bb8c8; }
