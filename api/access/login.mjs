@@ -19,7 +19,14 @@ async function handler(req, res) {
 
     const auth = getPublicClient();
     const { data, error } = await auth.auth.signInWithPassword({ email: syntheticAuthEmail(registration), password: pin });
-    if (error || !data.session || !data.user) throw new AccessError(401, 'Matrícula ou senha inválida.');
+    if (error) {
+      const status = Number(error.status || error.context?.status || 0);
+      const details = `${error.code || ''} ${error.message || ''}`.toLowerCase();
+      const serviceUnavailable = status >= 500 || /fetch|network|timeout|gateway|unavailable|web server is down|521|503/.test(details);
+      if (serviceUnavailable) throw new AccessError(503, 'O serviço de autenticação está indisponível. Tente novamente em alguns minutos.');
+      throw new AccessError(401, 'Matrícula ou senha inválida.');
+    }
+    if (!data.session || !data.user) throw new AccessError(503, 'O serviço de autenticação não retornou uma sessão válida.');
 
     const { data: profile, error: profileError } = await admin.from('access_profiles')
       .select('user_id,registration,full_name,email,company,job_title,access_status,is_admin')
