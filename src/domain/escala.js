@@ -357,7 +357,7 @@ export function validateEscala(scale) {
   }
   (scale?.employees || []).forEach((person) => {
     let streak = 0; let dsrCount = 0; let previousStatus = null;
-    dates.forEach((date) => { const status = person.assignments[formatDateKey(date)]; if (status === 'SA' && previousStatus === 'SA' && (!validationStart || date >= validationStart)) errors.push(`${person.name} · SA em dias consecutivos até ${formatDateLabel(date)}.`); if (status === 'DSR') { dsrCount += 1; streak = 0; } else if (statusIsWork(status)) { streak += 1; if ((!validationStart || date >= validationStart) && streak > escalaAssumptions.maxConsecutiveWorkDays) errors.push(`${person.name} · mais de 6 dias consecutivos até ${formatDateLabel(date)}.`); } previousStatus = status; });
+    dates.forEach((date) => { const status = person.assignments[formatDateKey(date)]; if (status === 'SA' && previousStatus === 'SA' && (!validationStart || date >= validationStart)) errors.push(`${person.name} · SA em dias consecutivos até ${formatDateLabel(date)}.`); if (status === 'DSR') { dsrCount += 1; streak = 0; } else if (status === 'FBH') { streak = 0; } else if (statusIsWork(status)) { streak += 1; if ((!validationStart || date >= validationStart) && streak > escalaAssumptions.maxConsecutiveWorkDays) errors.push(`${person.name} · mais de 6 dias consecutivos até ${formatDateLabel(date)}.`); } previousStatus = status; });
     const target = Number.isFinite(Number(scale?.dsrTarget)) ? Number(scale.dsrTarget) : dates.filter((date) => date.getDay() === 0 || (scale.holidays || []).includes(formatDateKey(date))).length;
     if (dsrCount < target) warnings.push(`${person.name} · ${dsrCount}/${target} DSR no ciclo.`);
   });

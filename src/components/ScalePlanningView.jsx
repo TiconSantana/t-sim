@@ -129,9 +129,19 @@ export default function ScalePlanningView() {
     setHolidayText(next.join(',')); setMessage(next.length ? next.length + ' feriado(s) mantido(s).' : 'Nenhum feriado adicional configurado.');
   }
   async function saveConfiguration() {
-    const next = buildNext();
+    const expectedDsrTarget = dsrTarget * projectionCycles;
+    const currentHolidays = [...(scale.holidays || [])].sort().join(',');
+    const configuredHolidays = [...holidays].sort().join(',');
+    const currentRanges = JSON.stringify(scale.vacationRanges || []);
+    const configuredRanges = JSON.stringify(vacationRanges || []);
+    const currentMatchesConfiguration = scale.generationStart === generationStart
+      && scale.generationEnd === generationEnd
+      && Number(scale.dsrTarget) === Number(expectedDsrTarget)
+      && currentHolidays === configuredHolidays
+      && currentRanges === configuredRanges;
+    const next = currentMatchesConfiguration ? scale : buildNext();
     const savedAt = new Date().toISOString();
-    setScale(next); setLastSavedAt(savedAt); setMessage('Configurações salvas. A planilha será gerada com a janela selecionada.');
+    setScale(next); setLastSavedAt(savedAt); setMessage(currentMatchesConfiguration ? 'Correções e configurações salvas. A escala foi revalidada para exportação.' : 'Configurações salvas. A planilha será gerada com a janela selecionada.');
     await exportWorkbook(next);
   }
   function validateRange(start, end) {
