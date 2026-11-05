@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CalendarDays, CheckCircle2, Download, FileSpreadsheet, Gauge, RefreshCw, ShieldAlert, Upload, UsersRound, Save, Plus, Trash2 } from 'lucide-react';
 import { bancoHorasSeed } from '../data/bancoHorasSeed';
 import { escalaSeed } from '../data/escalaSeed';
-import { applyScaleSuggestion, buildBankExportRows, buildFuelCreditExportRows, buildFuelCreditCandidates, buildScaleExportRows, buildScaleSuggestions, formatDateKey, formatDateLabel, generateEscala, parseBancoHorasSeed, parseBancoHorasWorkbookRows, parseEscalaSeed, parseEscalaWorkbookRows } from '../domain/escala';
+import { applyScaleSuggestion, buildBankExportRows, buildFuelCreditExportRows, buildFuelCreditCandidates, buildScaleExportRows, buildScaleSuggestions, escalaAssumptions, formatDateKey, formatDateLabel, generateEscala, parseBancoHorasSeed, parseBancoHorasWorkbookRows, parseEscalaSeed, parseEscalaWorkbookRows } from '../domain/escala';
 
 const initialScale = parseEscalaSeed(escalaSeed);
 const initialBank = parseBancoHorasSeed(bancoHorasSeed);
@@ -41,7 +41,12 @@ function makeInitialState() {
       const savedGenerationStart = saved.generationStart || saved.scale.generationStart || '2026-11-02';
       const savedGenerationEnd = saved.generationEnd || saved.scale.generationEnd || saved.scale.cycleEnd;
       const sourceDates = (saved.sourceScale.dates || []).map(readDate);
-      return { ...saved, sourceScale: { ...saved.sourceScale, dates: sourceDates }, scale: { ...saved.scale, dates, dsrTarget: savedDsrTarget, generationStart: savedGenerationStart, generationEnd: savedGenerationEnd }, vacationRanges: saved.vacationRanges || [], dsrTarget: savedDsrTarget, generationStart: savedGenerationStart, generationEnd: savedGenerationEnd, holidayText };
+      const savedRanges = saved.vacationRanges || [];
+      const savedHolidays = parseHolidayText(holidayText);
+      const savedScale = saved.scale.assumptions?.version === escalaAssumptions.version
+        ? { ...saved.scale, dates, dsrTarget: savedDsrTarget, generationStart: savedGenerationStart, generationEnd: savedGenerationEnd }
+        : generateEscala({ scale: { ...saved.sourceScale, dates: sourceDates }, bank: saved.bank, generationStart: savedGenerationStart, generationEnd: savedGenerationEnd, dsrTarget: savedDsrTarget * projectionCycleCount(savedGenerationStart, savedGenerationEnd), vacationRanges: savedRanges, holidays: savedHolidays });
+      return { ...saved, sourceScale: { ...saved.sourceScale, dates: sourceDates }, scale: savedScale, vacationRanges: savedRanges, dsrTarget: savedDsrTarget, generationStart: savedGenerationStart, generationEnd: savedGenerationEnd, holidayText };
     }
   } catch { /* volta à semente */ }
   return { sourceScale: initialScale, bank: initialBank, scale: defaultScale, vacationRanges: [], dsrTarget: defaultScale.dsrTarget, generationStart: defaultScale.generationStart, generationEnd: defaultScale.generationEnd, holidayText: holidays.join(',') };
