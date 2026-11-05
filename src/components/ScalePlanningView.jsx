@@ -43,7 +43,8 @@ function makeInitialState() {
       const sourceDates = (saved.sourceScale.dates || []).map(readDate);
       const savedRanges = saved.vacationRanges || [];
       const savedHolidays = parseHolidayText(holidayText);
-      const savedScale = saved.scale.assumptions?.version === escalaAssumptions.version
+      const savedWeekendRuleError = (saved.scale.validation?.errors || []).some((error) => /somente um grupo|sábado deve|domingo deve|grupos de SA do sábado|repete a folga/.test(error));
+      const savedScale = saved.scale.assumptions?.version === escalaAssumptions.version && !savedWeekendRuleError
         ? { ...saved.scale, dates, dsrTarget: savedDsrTarget, generationStart: savedGenerationStart, generationEnd: savedGenerationEnd }
         : generateEscala({ scale: { ...saved.sourceScale, dates: sourceDates }, bank: saved.bank, generationStart: savedGenerationStart, generationEnd: savedGenerationEnd, dsrTarget: savedDsrTarget * projectionCycleCount(savedGenerationStart, savedGenerationEnd), vacationRanges: savedRanges, holidays: savedHolidays });
       return { ...saved, sourceScale: { ...saved.sourceScale, dates: sourceDates }, scale: savedScale, vacationRanges: savedRanges, dsrTarget: savedDsrTarget, generationStart: savedGenerationStart, generationEnd: savedGenerationEnd, holidayText };
@@ -139,11 +140,13 @@ export default function ScalePlanningView() {
     const configuredHolidays = [...holidays].sort().join(',');
     const currentRanges = JSON.stringify(scale.vacationRanges || []);
     const configuredRanges = JSON.stringify(vacationRanges || []);
+    const weekendRuleError = (scale.validation?.errors || []).some((error) => /somente um grupo|sábado deve|domingo deve|grupos de SA do sábado|repete a folga/.test(error));
     const currentMatchesConfiguration = scale.generationStart === generationStart
       && scale.generationEnd === generationEnd
       && Number(scale.dsrTarget) === Number(expectedDsrTarget)
       && currentHolidays === configuredHolidays
-      && currentRanges === configuredRanges;
+      && currentRanges === configuredRanges
+      && !weekendRuleError;
     const next = currentMatchesConfiguration ? scale : buildNext();
     const savedAt = new Date().toISOString();
     setScale(next); setLastSavedAt(savedAt); setMessage(currentMatchesConfiguration ? 'Correções e configurações salvas. A escala foi revalidada para exportação.' : 'Configurações salvas. A planilha será gerada com a janela selecionada.');
