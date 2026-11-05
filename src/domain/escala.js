@@ -8,7 +8,7 @@ const MONTHS = {
 
 export const escalaAssumptions = {
   source: 'Instruções do responsável · T-Sim',
-  version: 'escala-v1.1',
+  version: 'escala-v1.2',
   validity: 'Ciclo 16/10/2026 a 15/11/2026',
   responsible: 'A confirmar',
   fbhMinutes: MINUTES_PER_FBH,
