@@ -6,7 +6,7 @@ import { calculateDimensionCoverage, calculateCoverage, validateScenarioForAppro
 import { calculateSimulation } from '../src/domain/simulation.js';
 import { bancoHorasSeed } from '../src/data/bancoHorasSeed.js';
 import { escalaSeed } from '../src/data/escalaSeed.js';
-import { buildFuelCreditCandidates, generateEscala, parseBancoHorasSeed, parseEscalaSeed, validateEscala } from '../src/domain/escala.js';
+import { buildFuelCreditCandidates, formatDateKey, generateEscala, parseBancoHorasSeed, parseEscalaSeed, validateEscala } from '../src/domain/escala.js';
 
 test('calcula quatro promoções automáticas no cenário auxiliar para técnico II', () => {
   const result = calculateSimulation({
@@ -125,6 +125,27 @@ test('gera a nova escala preservando até 01/11 e sincronizando duplas', () => {
   const pair = generated.employees.filter((person) => person.pair === 'F-20');
   assert.equal(pair[0].assignments['2026-11-02'], pair[1].assignments['2026-11-02']);
   assert.equal(generated.validation.errors.some((error) => error.includes('mais de um grupo de fusão')), false);
+});
+
+test('distribui o descanso de fim de semana entre grupos sem repetir o mesmo grupo', () => {
+  const generated = generateEscala({ scale: parseEscalaSeed(escalaSeed), bank: parseBancoHorasSeed(bancoHorasSeed), generationStart: '2026-11-02', generationEnd: '2026-11-15', dsrTarget: 6 });
+  const groupsFor = (dateKey, predicate) => new Set(generated.employees.filter((person) => person.className === 'Fusão' && predicate(person.assignments[dateKey])).map((person) => String(person.team).match(/([ABC])$/)?.[1]).filter(Boolean));
+  const weekends = ['2026-11-07', '2026-11-14'].map((satKey) => {
+    const sun = new Date(satKey + 'T00:00:00'); sun.setDate(sun.getDate() + 1); const sunKey = formatDateKey(sun);
+    const restGroups = ['A', 'B', 'C'].filter((group) => generated.employees.some((person) => person.className === 'Fusão' && String(person.team).endsWith(group) && ['DSR', 'FBH'].includes(person.assignments[satKey])) && generated.employees.some((person) => person.className === 'Fusão' && String(person.team).endsWith(group) && ['DSR', 'FBH'].includes(person.assignments[sunKey])));
+    const satSa = groupsFor(satKey, (status) => status === 'SA'); const sunSa = groupsFor(sunKey, (status) => status === 'SA');
+    assert.equal(satSa.size, 1); assert.equal(sunSa.size, 1); assert.notEqual([...satSa][0], [...sunSa][0]); assert.equal(restGroups.length, 1);
+    return restGroups[0];
+  });
+  assert.notEqual(weekends[0], weekends[1]);
+  assert.equal(generated.validation.errors.some((error) => error.includes('somente um grupo pode ter FBH/DSR')), false);
+});
+
+test('validação bloqueia dois grupos com descanso nos dois dias do fim de semana', () => {
+  const generated = generateEscala({ scale: parseEscalaSeed(escalaSeed), bank: parseBancoHorasSeed(bancoHorasSeed), generationStart: '2026-11-02', generationEnd: '2026-11-15', dsrTarget: 6 });
+  const invalid = { ...generated, employees: generated.employees.map((person) => ({ ...person, assignments: { ...person.assignments } })) };
+  invalid.employees.filter((person) => person.className === 'Fusão' && String(person.team).endsWith('A')).forEach((person) => { person.assignments['2026-11-07'] = 'DSR'; person.assignments['2026-11-08'] = 'DSR'; });
+  assert.equal(validateEscala(invalid).errors.some((error) => error.includes('somente um grupo pode ter FBH/DSR')), true);
 });
 
 test('validação da escala exige duas duplas de Equipe L em SA', () => {

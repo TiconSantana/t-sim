@@ -26,13 +26,14 @@ Público: Operações, GA e responsável pela aprovação da escala.
 - A primeira carga preserva o histórico já ocorrido até a data escolhida; isso é específico do ciclo 16/10/2026→15/11/2026 e não vira regra fixa para futuras escalas.
 - A janela de elaboração tem início e fim editáveis e pode atravessar três, quatro ou mais ciclos; cada ciclo continua organizado do dia 16 ao dia 15 seguinte.
 - A rotação de SA mantém continuidade entre ciclos: se o último dia terminar com C, o próximo dia começa com A.
+- No fim de semana, um grupo de Fusão fica em SA no sábado, outro grupo diferente fica em SA no domingo e o terceiro grupo concentra as folgas `FBH`/`DSR` dos dois dias. O grupo de descanso não pode ser repetido no fim de semana seguinte; a validação bloqueia a exportação se houver mais de um grupo com descanso nos dois dias ou repetição consecutiva.
 - A tela permite editar equipe A/B/C, dupla, carro agregado e períodos de férias. A exportação destaca dias de fim de semana/feriados, grupos, férias, dia abreviado e saldos K/M.
 - A aba `ESCALA CAMPO` mantém as colunas `EQUIPE`, `CARRO`, `FUNÇÃO`, `MATRICULA`, `DUPLADO`, `NOME DO COLABORADOR` e `CONTATO`, aplica preenchimento ciano para A, amarelo para B, verde para C e usa bordas em toda a grade.
 - A validação bloqueante apresenta uma recomendação por erro, permite escolher o status de correção e aplicar o ajuste com revalidação imediata. O painel de Banco de horas permite importar a base e exportar a aba `BANCO_ALERTAS` para alimentar a próxima programação.
 - Correções aceitas são mantidas no estado atual ao salvar; o botão não reconstrói a escala por cima de uma correção aprovada. `DSR` e `FBH` reiniciam a contagem de dias consecutivos, enquanto `T` e `SA` continuam contando como trabalho.
 - O botão `Salvar configurações` grava a base atual no armazenamento local e gera imediatamente o Excel usando a janela escolhida, com nome `T-SIM_ESCALA_AAAA-MM-DD_A_AAAA-MM-DD.xlsx`. A aba `VALIDACAO` registra a janela, feriados, meta DSR e os horários de importação.
 - Sem uma nova planilha importada, a tela reutiliza a última base armazenada. Ao importar escala ou banco, a base local é substituída e a data/hora da última importação fica visível no rodapé da configuração e no Excel.
-- Fins de semana e feriados têm validação de cobertura de grupo e de duas duplas L.
+- Fins de semana e feriados têm validação de cobertura de grupo, SA distinto no sábado/domingo, descanso de um único grupo e duas duplas L.
 - Alertas de saldo são classificados por premissa versionada: alerta abaixo de 0h, crítico até -20h e extremo crítico até -40h. Os limiares ficam registrados no domínio e precisam de confirmação operacional antes de virar política da empresa.
 
 ## Estados e bloqueios

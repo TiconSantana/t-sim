@@ -17,6 +17,7 @@ export const escalaAssumptions = {
   negativeAlertHours: { alert: 0, critical: -20, extremeCritical: -40 },
   weekdayLimits: { fusionMorning: 1, fusionNight: 1, equipeL: 1 },
   weekendMorningTechnicianLimit: 3,
+  weekendGroupRule: 'Sábado e domingo usam grupos de SA diferentes; um único grupo pode concentrar FBH/DSR nos dois dias e esse grupo não se repete no fim de semana seguinte.',
 };
 
 function clean(value) { return String(value ?? '').trim(); }
@@ -159,6 +160,64 @@ function unitStatus(unit, dateKey) { return unit.find((person) => person.assignm
 function previousDateKey(date) { const previous = new Date(date); previous.setDate(previous.getDate() - 1); return formatDateKey(previous); }
 function unitHadStatusOnPreviousDay(unit, date, status) { const key = previousDateKey(date); return unit.some((person) => person.assignments[key] === status); }
 function groupHadStatusOnPreviousDay(employees, group, date, status) { const key = previousDateKey(date); return employees.some((person) => person.className === 'Fusão' && groupFromTeam(person.team) === group && person.assignments[key] === status); }
+function isRestStatus(status) { return status === 'DSR' || status === 'FBH'; }
+function fusionPeopleForGroup(employees, group) { return employees.filter((person) => person.className === 'Fusão' && groupFromTeam(person.team) === group); }
+function groupHasWeekendRest(employees, group, satKey, sunKey) {
+  const people = fusionPeopleForGroup(employees, group);
+  return people.length > 0 && [satKey, sunKey].every((key) => people.some((person) => isRestStatus(person.assignments[key])));
+}
+function previousWeekendRestGroup(employees, startDate, rotation) {
+  const cursor = new Date(startDate);
+  while (cursor.getDay() !== 6) cursor.setDate(cursor.getDate() - 1);
+  if (cursor >= startDate) cursor.setDate(cursor.getDate() - 7);
+  const satKey = formatDateKey(cursor);
+  const sun = new Date(cursor); sun.setDate(sun.getDate() + 1);
+  const sunKey = formatDateKey(sun);
+  return rotation.find((group) => groupHasWeekendRest(employees, group, satKey, sunKey)) || null;
+}
+function buildWeekendPlans(employees, cycleDates, startDate, endDate, rotation, startRotationIndex) {
+  const plans = new Map(); let previousRest = previousWeekendRestGroup(employees, startDate, rotation);
+  const saturdays = cycleDates.filter((date) => date.getDay() === 6 && date >= startDate && date <= endDate).filter((date) => { const sun = new Date(date); sun.setDate(sun.getDate() + 1); return sun <= endDate; });
+  saturdays.forEach((sat, index) => {
+    const restCandidates = rotation.map((_, offset) => rotation[(startRotationIndex + index + offset) % rotation.length]);
+    const restGroup = restCandidates.find((group) => group !== previousRest) || restCandidates[0];
+    const saGroups = rotation.filter((group) => group !== restGroup);
+    const sun = new Date(sat); sun.setDate(sun.getDate() + 1);
+    const weekend = { satKey: formatDateKey(sat), sunKey: formatDateKey(sun), restGroup, satSaGroup: saGroups[0], sunSaGroup: saGroups[1] };
+    plans.set(weekend.satKey, { ...weekend, saGroup: weekend.satSaGroup });
+    plans.set(weekend.sunKey, { ...weekend, saGroup: weekend.sunSaGroup });
+    previousRest = restGroup;
+  });
+  return plans;
+}
+function weekendRestStatus(unit, dateKey, cycleDates, bankMap, targetDsr) {
+  const needsDsr = unit.some((person) => countStatuses(person, cycleDates, 'DSR') < targetDsr);
+  if (needsDsr) return 'DSR';
+  const canFbh = unit.every((person) => (bankMap.get(String(person.registration))?.saldoTotalMinutes || 0) >= MINUTES_PER_FBH);
+  return canFbh ? 'FBH' : 'DSR';
+}
+function enforceWeekendGroupPattern(employees, units, weekendPlans, cycleDates, bankMap, targetDsr) {
+  const handled = new Set();
+  [...weekendPlans.values()].forEach((plan) => {
+    if (handled.has(plan.satKey)) return;
+    handled.add(plan.satKey);
+    const groups = [...new Set(employees.filter((person) => person.className === 'Fusão').map((person) => groupFromTeam(person.team)).filter(Boolean))];
+    const dayKeys = [plan.satKey, plan.sunKey];
+    const restUnits = (group, key) => units.filter((unit) => unit[0].className === 'Fusão' && groupFromTeam(unit[0].team) === group && unit.some((person) => person.assignments[key] !== 'FÉRIAS') && isRestStatus(unitStatus(unit, key)));
+    dayKeys.forEach((key) => {
+      if (!restUnits(plan.restGroup, key).length) {
+        const unit = units.find((item) => item[0].className === 'Fusão' && groupFromTeam(item[0].team) === plan.restGroup && item.some((person) => person.assignments[key] !== 'FÉRIAS') && unitStatus(item, key) === 'T');
+        if (unit) setUnitStatus(unit, key, weekendRestStatus(unit, key, cycleDates, bankMap, targetDsr));
+      }
+    });
+    groups.filter((group) => group !== plan.restGroup).forEach((group) => {
+      if (!groupHasWeekendRest(employees, group, plan.satKey, plan.sunKey)) return;
+      const satUnits = restUnits(group, plan.satKey); const sunUnits = restUnits(group, plan.sunKey);
+      const clearKey = satUnits.length <= sunUnits.length ? plan.satKey : plan.sunKey;
+      restUnits(group, clearKey).forEach((unit) => setUnitStatus(unit, clearKey, 'T'));
+    });
+  });
+}
 
 function applyVacationRanges(employees, vacationRanges = [], cycleStart, cycleEnd) {
   const cycleDates = buildCycleDates(cycleStart, cycleEnd);
@@ -191,14 +250,19 @@ export function generateEscala({ scale, bank, generationStart = '2026-11-02', ge
   const priorGroup = lastPreserved ? employees.filter((person) => groupFromTeam(person.team) && person.assignments[formatDateKey(lastPreserved)] === 'SA').reduce((acc, person) => { const group = groupFromTeam(person.team); acc[group] = (acc[group] || 0) + 1; return acc; }, {}) : {};
   const priorGroupName = Object.entries(priorGroup).sort((a, b) => b[1] - a[1])[0]?.[0];
   const startRotationIndex = priorGroupName ? (rotation.indexOf(priorGroupName) + 1) % rotation.length : 0;
+  const weekendPlans = buildWeekendPlans(employees, cycleDates, startDate, endDate, rotation, startRotationIndex);
   const validation = [];
 
   cycleDates.filter((date) => date >= startDate && date <= endDate).forEach((date, dayIndex) => {
     const dateKey = formatDateKey(date);
-    let saGroup = rotation[(startRotationIndex + dayIndex) % rotation.length];
+    const weekendPlan = weekendPlans.get(dateKey);
+    let saGroup = weekendPlan?.saGroup || rotation[(startRotationIndex + dayIndex) % rotation.length];
     const groupPressure = rotation.map((group) => ({ group, due: employees.filter((person) => person.className === 'Fusão' && groupFromTeam(person.team) === group && person.assignments[dateKey] !== 'FÉRIAS' && workStreak(person, date, person.assignments) >= escalaAssumptions.maxConsecutiveWorkDays).length }));
-    if ((groupPressure.find((item) => item.group === saGroup)?.due || 0) > 0) saGroup = [...groupPressure].sort((a, b) => a.due - b.due || rotation.indexOf(a.group) - rotation.indexOf(b.group))[0]?.group || saGroup;
-    if (groupHadStatusOnPreviousDay(employees, saGroup, date, 'SA')) {
+    if (!weekendPlan && (groupPressure.find((item) => item.group === saGroup)?.due || 0) > 0) saGroup = [...groupPressure].sort((a, b) => a.due - b.due || rotation.indexOf(a.group) - rotation.indexOf(b.group))[0]?.group || saGroup;
+    if (weekendPlan) {
+      const weekendCandidates = [saGroup, ...rotation.filter((group) => group !== weekendPlan.restGroup && group !== saGroup)];
+      saGroup = weekendCandidates.find((group) => !groupHadStatusOnPreviousDay(employees, group, date, 'SA')) || saGroup;
+    } else if (groupHadStatusOnPreviousDay(employees, saGroup, date, 'SA')) {
       const rotationOrder = rotation.map((_, offset) => rotation[(startRotationIndex + dayIndex + offset) % rotation.length]);
       saGroup = rotationOrder.find((group) => !groupHadStatusOnPreviousDay(employees, group, date, 'SA')) || saGroup;
     }
@@ -226,12 +290,14 @@ export function generateEscala({ scale, bank, generationStart = '2026-11-02', ge
     const weekday = date.getDay();
     const isHoliday = holidays.includes(dateKey);
     const candidates = units.filter((unit) => unitStatus(unit, dateKey) === 'T' && unit.some((person) => person.assignments[dateKey] !== 'FÉRIAS'));
+    const weekendRestGroup = weekendPlan?.restGroup;
+    const eligibleWeekendCandidates = weekendRestGroup ? candidates.filter((unit) => unit[0].className !== 'Fusão' || groupFromTeam(unit[0].team) === weekendRestGroup) : candidates;
     const due = candidates.filter((unit) => unit.some((person) => {
       const row = bankMap.get(String(person.registration));
       const target = row?.saldoTotalMinutes < 0 ? Math.max(1, targetDsr) : targetDsr;
       return countStatuses(person, cycleDates, 'DSR') < target && workStreak(person, date, person.assignments) >= escalaAssumptions.maxConsecutiveWorkDays - 1;
     }));
-    const preferred = isHoliday || weekday === 0 ? candidates : due;
+    const preferred = isHoliday || weekday === 0 ? eligibleWeekendCandidates : due.filter((unit) => !weekendRestGroup || unit[0].className !== 'Fusão' || groupFromTeam(unit[0].team) === weekendRestGroup);
     const capFor = (unit) => {
       if (unit[0].className === 'Equipe L') return escalaAssumptions.weekdayLimits.equipeL;
       if (unit[0].shift === 'Noite') return isWeekend(date) ? 2 : escalaAssumptions.weekdayLimits.fusionNight;
@@ -245,7 +311,7 @@ export function generateEscala({ scale, bank, generationStart = '2026-11-02', ge
     remainingPreferred.sort((a, b) => Math.max(...b.map((person) => workStreak(person, date, person.assignments))) - Math.max(...a.map((person) => workStreak(person, date, person.assignments))));
     remainingPreferred.forEach((unit) => { const label = `${unit[0].className}-${unit[0].shift}`; const used = capByClass.get(label) || 0; if (used < capFor(unit)) { setUnitStatus(unit, dateKey, 'DSR'); capByClass.set(label, used + 1); } });
 
-    const fbhCandidates = units.filter((unit) => unitStatus(unit, dateKey) === 'T');
+    const fbhCandidates = units.filter((unit) => unitStatus(unit, dateKey) === 'T' && (!weekendRestGroup || unit[0].className !== 'Fusão' || groupFromTeam(unit[0].team) === weekendRestGroup));
     fbhCandidates.sort((a, b) => (bankMap.get(String(b[0].registration))?.saldoAtualMinutes || 0) - (bankMap.get(String(a[0].registration))?.saldoAtualMinutes || 0));
     fbhCandidates.forEach((unit) => {
       const shouldReduce = unit.every((person) => countStatuses(person, cycleDates, 'DSR') >= targetDsr)
@@ -265,6 +331,7 @@ export function generateEscala({ scale, bank, generationStart = '2026-11-02', ge
       if (person.assignments[key] === 'FBH') { person.assignments[key] = 'DSR'; missing -= 1; }
     });
   });
+  enforceWeekendGroupPattern(employees, units, weekendPlans, cycleDates, bankMap, targetDsr);
 
   const result = { ...source, cycleStart: formatDateKey(referenceCycleStart), cycleEnd: formatDateKey(referenceCycleEnd), scheduleStart: formatDateKey(scheduleStart), scheduleEnd: formatDateKey(scheduleEnd), dates: cycleDates, generationStart: formatDateKey(startDate), generationEnd: formatDateKey(endDate), dsrTarget: targetDsr, vacationRanges, holidays, employees, assumptions: escalaAssumptions, generatedAt: new Date().toISOString() };
   result.validation = validateEscala(result);
@@ -355,6 +422,28 @@ export function validateEscala(scale) {
     if (lSaPairs.size < 2) errors.push(`${formatDateLabel(date)} · Equipe L com ${lSaPairs.size} dupla(s) em SA; mínimo 2.`);
     daySummary.push({ date: key, weekday: WEEKDAYS[date.getDay()], saGroups: [...saGroups], lSaPairs: [...lSaPairs], dsr: people.filter((person) => person.assignments[key] === 'DSR').length, fbh: people.filter((person) => person.assignments[key] === 'FBH').length });
   }
+  const fusionGroups = [...new Set((scale?.employees || []).map((person) => groupFromTeam(person.team)).filter(Boolean))];
+  const weekendRestGroups = [];
+  dates.filter((date) => date.getDay() === 6 && (!validationStart || date >= validationStart)).forEach((sat) => {
+    const sun = new Date(sat); sun.setDate(sun.getDate() + 1);
+    const sunKey = formatDateKey(sun);
+    if (!dates.some((date) => formatDateKey(date) === sunKey)) return;
+    const satKey = formatDateKey(sat);
+    const satSaGroups = new Set((scale.employees || []).filter((person) => person.className === 'Fusão' && person.assignments[satKey] === 'SA').map((person) => groupFromTeam(person.team)).filter(Boolean));
+    const sunSaGroups = new Set((scale.employees || []).filter((person) => person.className === 'Fusão' && person.assignments[sunKey] === 'SA').map((person) => groupFromTeam(person.team)).filter(Boolean));
+    if (satSaGroups.size !== 1) errors.push(`${formatDateLabel(sat)} · sábado deve ter exatamente um grupo de Fusão em SA.`);
+    if (sunSaGroups.size !== 1) errors.push(`${formatDateLabel(sun)} · domingo deve ter exatamente um grupo de Fusão em SA.`);
+    if (satSaGroups.size === 1 && sunSaGroups.size === 1 && [...satSaGroups][0] === [...sunSaGroups][0]) errors.push(`${formatDateLabel(sat)}–${formatDateLabel(sun)} · os grupos de SA do sábado e domingo devem ser diferentes.`);
+    const restGroups = fusionGroups.filter((group) => groupHasWeekendRest(scale.employees || [], group, satKey, sunKey));
+    if (restGroups.length !== 1) errors.push(`${formatDateLabel(sat)}–${formatDateLabel(sun)} · somente um grupo pode ter FBH/DSR nos dois dias do fim de semana (encontrados: ${restGroups.join(', ') || 'nenhum'}).`);
+    weekendRestGroups.push({ satKey, sunKey, groups: restGroups });
+  });
+  weekendRestGroups.forEach((weekend, index) => {
+    const previous = weekendRestGroups[index - 1];
+    if (previous && previous.groups.length === 1 && weekend.groups.length === 1 && previous.groups[0] === weekend.groups[0]) errors.push(`${formatDateLabel(toLocalDate(weekend.satKey))} · o grupo ${weekend.groups[0]} não pode repetir a folga de sábado e domingo em dois finais de semana consecutivos.`);
+  });
+  const preservedRestGroup = validationStart ? previousWeekendRestGroup(scale?.employees || [], validationStart, fusionGroups) : null;
+  if (preservedRestGroup && weekendRestGroups[0]?.groups.length === 1 && preservedRestGroup === weekendRestGroups[0].groups[0]) errors.push(`${formatDateLabel(toLocalDate(weekendRestGroups[0].satKey))} · o grupo ${preservedRestGroup} repete a folga de sábado e domingo do fim de semana anterior.`);
   (scale?.employees || []).forEach((person) => {
     let streak = 0; let dsrCount = 0; let previousStatus = null;
     dates.forEach((date) => { const status = person.assignments[formatDateKey(date)]; if (status === 'SA' && previousStatus === 'SA' && (!validationStart || date >= validationStart)) errors.push(`${person.name} · SA em dias consecutivos até ${formatDateLabel(date)}.`); if (status === 'DSR') { dsrCount += 1; streak = 0; } else if (status === 'FBH') { streak = 0; } else if (statusIsWork(status)) { streak += 1; if ((!validationStart || date >= validationStart) && streak > escalaAssumptions.maxConsecutiveWorkDays) errors.push(`${person.name} · mais de 6 dias consecutivos até ${formatDateLabel(date)}.`); } previousStatus = status; });
